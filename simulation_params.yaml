@@ -1,0 +1,25 @@
+# Preprocessing
+add_solvent: False
+remove_non_simulated: True
+
+# Minimization
+minimization_steps: 1000
+
+# Equilibration
+nvt_steps: 0
+npt_steps: 0
+eq_pressure: 1 # bar
+eq_temperature: 300 # kelvin
+
+# Simulation
+force_field: "charmm36.xml"
+water_model: "charmm36/water.xml"
+sim_steps: 10000
+
+# Integrator
+temperature: 300 # kelvin
+friction_coeff: 1.0 # picoseconds
+timestep: 2.0 # femtoseconds
+
+# Reporters
+report_interval: 100
