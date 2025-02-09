@@ -74,5 +74,24 @@ class SimulationParameters:
                 print(f'Error reading configuration file "{file_name}"')
 
     def serialize(self, file_name):
+        print(f"Writing configuration to {file_name}")
         with open(file_name, "w") as file:
-            yaml.dump(self, file)
+            yaml.dump(
+                {
+                    "add_solvent": self.add_solvent,
+                    "remove_non_simulated": self.remove_non_simulated,
+                    "minimization_steps": self.minimization_steps,
+                    "nvt_steps": self.nvt_steps,
+                    "npt_steps": self.npt_steps,
+                    "eq_pressure": self.eq_pressure,
+                    "eq_temperature": self.eq_temperature,
+                    "force_field": self.force_field,
+                    "water_model": self.water_model,
+                    "sim_steps": self.sim_steps,
+                    "temperature": self.temperature,
+                    "friction_coeff": self.friction_coeff,
+                    "timestep": self.timestep,
+                    "report_interval": self.report_interval,
+                },
+                file,
+            )

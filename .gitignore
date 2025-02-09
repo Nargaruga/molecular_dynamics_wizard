@@ -5,6 +5,7 @@
 *build
 
 *.cif
+*.zip
 
 inputs/
 tmp
