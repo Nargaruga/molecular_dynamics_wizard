@@ -17,6 +17,23 @@ WIZARD_ROOT = (
 )
 
 
+def load_configuration():
+    params = SimulationParameters()
+
+    install_data_path = os.path.join("dynamics_extra", "installation_data.json")
+    with open(install_data_path) as f:
+        data = json.load(f)
+        try:
+            config_path = data["config_path"]
+            params.parse_file(os.path.join(config_path, "simulation_params.yaml"))
+        except KeyError:
+            print(
+                f"WARNING: Failed to read configuration file path from {install_data_path}, using default config."
+            )
+
+    return params
+
+
 class WizardState(IntEnum):
     """The possible states of the wizard."""
 
@@ -161,8 +178,7 @@ class Dynamics(Wizard):
             cmd.refresh_wizard()
             return
 
-        sim_params = SimulationParameters()
-        sim_params.parse_file(os.path.join("dynamics_extra", "simulation_params.yaml"))
+        sim_params = load_configuration()
 
         tmp_dir = os.path.join(
             "tmp",

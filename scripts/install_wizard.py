@@ -86,13 +86,32 @@ if not os.path.exists(pymol_dir):
 
 print("Copying files...")
 installed_wizard_dir = os.path.join(pymol_dir, "wizard")
+config_location = os.path.join(prefix, ".pymol_wizards_config", f"{WIZARD_NAME}")
+
+# Record information for the uninstallation process
+data = {
+    "conda_env": current_env,
+    "config_path": config_location,
+    "to_remove": [
+        os.path.join(installed_wizard_dir, f"{WIZARD_NAME}.py"),
+        os.path.join(installed_wizard_dir, f"{WIZARD_NAME}_extra"),
+        os.path.join(installed_wizard_dir, "molecular_dynamics"),
+    ],
+}
+with open(os.path.join(wizard_root, "installation_data.json"), "w") as f:
+    json.dump(data, f)
+
 try:
     shutil.copy(
         os.path.join(wizard_root, f"{WIZARD_NAME}.py"),
         os.path.join(installed_wizard_dir, f"{WIZARD_NAME}.py"),
     )
 
-    os.makedirs(os.path.join(installed_wizard_dir, f"{WIZARD_NAME}_extra"), exist_ok=True)
+    os.makedirs(
+        os.path.join(installed_wizard_dir, f"{WIZARD_NAME}_extra"), exist_ok=True
+    )
+
+    os.makedirs(os.path.join(config_location), exist_ok=True)
 
     # shutil.copytree(
     #     os.path.join(wizard_root, "martini_parameters"),
@@ -105,9 +124,18 @@ try:
 
     shutil.copy(
         os.path.join(wizard_root, "simulation_params.yaml"),
+        os.path.join(config_location, "simulation_params.yaml"),
+    )
+
+    shutil.copy(
+        os.path.join(wizard_root, "installation_data.json"),
         os.path.join(
-            installed_wizard_dir, f"{WIZARD_NAME}_extra", "simulation_params.yaml"
+            installed_wizard_dir, f"{WIZARD_NAME}_extra", "installation_data.json"
         ),
+    )
+    shutil.copy(
+        os.path.join(wizard_root, "installation_data.json"),
+        os.path.join(wizard_root, "plugin", "installation_data.json"),
     )
 
     shutil.copytree(
@@ -119,17 +147,7 @@ except shutil.Error as e:
     print(f"Failed to copy files: {e}")
     exit(1)
 
-# Record information for the uninstallation process
-data = {
-    "conda_env": current_env,
-    "to_remove": [
-        os.path.join(installed_wizard_dir, f"{WIZARD_NAME}.py"),
-        os.path.join(installed_wizard_dir, f"{WIZARD_NAME}_extra"),
-        os.path.join(installed_wizard_dir, "molecular_dynamics"),
-    ],
-}
-with open(os.path.join(wizard_root, "installation_data.json"), "w") as f:
-    json.dump(data, f)
+# TODO install plugin
 
 print("Adding menu entries...")
 # Edit the openvr wizard to add a menu item in the internal menu
