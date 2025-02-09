@@ -1,6 +1,5 @@
 import yaml
 
-from openmm.unit import kelvin, picosecond, femtosecond, nanometer, bar
 
 
 class SimulationParameters:
@@ -14,8 +13,8 @@ class SimulationParameters:
     # Equilibration
     nvt_steps: int = 1000
     npt_steps: int = 1000
-    eq_pressure: float = 1.0 * bar
-    eq_temperature: float = 300.0 * kelvin
+    eq_pressure: float = 1.0 # bar
+    eq_temperature: float = 300.0 # kelvin
 
     # Simulation
     force_field: str = "charmm36.xml"
@@ -23,9 +22,9 @@ class SimulationParameters:
     sim_steps: int = 100000
 
     # Integrator
-    temperature: float = 300.0 * kelvin
-    friction_coeff: float = 1.0 / picosecond
-    timestep: float = 2.0 * femtosecond
+    temperature: float = 300.0 # kelvin
+    friction_coeff: float = 1.0 # 1/picosecond
+    timestep: float = 2.0 # femtosecond
 
     # Reporters
     report_interval: int = 1000
@@ -47,6 +46,7 @@ class SimulationParameters:
         print(f"Report interval: {self.report_interval}")
 
     def parse_file(self, file_name):
+        print(f"Reading configuration from {file_name}")
         with open(file_name, "r") as file:
             try:
                 config = yaml.safe_load(file)
@@ -58,17 +58,21 @@ class SimulationParameters:
 
                 self.nvt_steps = config["nvt_steps"]
                 self.npt_steps = config["npt_steps"]
-                self.eq_pressure = config["eq_pressure"] * bar
-                self.eq_temperature = config["eq_temperature"] * kelvin
+                self.eq_pressure = config["eq_pressure"]
+                self.eq_temperature = config["eq_temperature"] 
 
                 self.force_field = config["force_field"]
                 self.water_model = config["water_model"]
                 self.sim_steps = config["sim_steps"]
 
-                self.temperature = config["temperature"] * kelvin
-                self.friction_coeff = config["friction_coeff"] / picosecond
-                self.timestep = config["timestep"] * femtosecond
+                self.temperature = config["temperature"] 
+                self.friction_coeff = config["friction_coeff"]
+                self.timestep = config["timestep"]
 
                 self.report_interval = config["report_interval"]
             except yaml.YAMLError:
                 print(f'Error reading configuration file "{file_name}"')
+
+    def serialize(self, file_name):
+        with open(file_name, "w") as file:
+            yaml.dump(self, file)

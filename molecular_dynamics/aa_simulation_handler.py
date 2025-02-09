@@ -4,7 +4,8 @@ from openmm.app.pdbfile import PDBFile
 from openmm.app import Simulation
 from openmm.openmm import LangevinIntegrator, MonteCarloBarostat
 from openmm.app import ForceField, NoCutoff
-from openmm.unit import nanometer
+from openmm.unit import kelvin, picosecond, femtosecond, nanometer, bar
+
 import pdbfixer
 
 from pymol import cmd
@@ -90,9 +91,9 @@ class AllAtomSimulationHandler(SimulationHandler):
         )
 
         integrator = LangevinIntegrator(
-            self.parameters.temperature,
-            self.parameters.friction_coeff,
-            self.parameters.timestep,
+            self.parameters.temperature * kelvin,
+            self.parameters.friction_coeff / picosecond,
+            self.parameters.timestep * femtosecond,
         )
 
         # constrained_atoms = set()
@@ -124,7 +125,8 @@ class AllAtomSimulationHandler(SimulationHandler):
             print("NPT Equilibration...")
             system.addForce(
                 MonteCarloBarostat(
-                    self.parameters.eq_pressure, self.parameters.eq_temperature
+                    self.parameters.eq_pressure * bar,
+                    self.parameters.eq_temperature * kelvin,
                 )
             )
             simulation.context.reinitialize(preserveState=True)
