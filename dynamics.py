@@ -239,6 +239,7 @@ class Dynamics(Wizard):
                     "paratope": list(paratope_residues),
                     "neighbourhood": list(paratope_neigh_residues),
                     "locked": list(locked_neigh_residues),
+                    "depth": depth,
                 },
                 f,
             )
