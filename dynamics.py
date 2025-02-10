@@ -182,7 +182,7 @@ class Dynamics(Wizard):
 
         tmp_dir = os.path.join(
             "tmp",
-            f"{self.molecule}_{time.strftime('%Y-%m-%d_%H-%M-%S')}_d{depth}_s{sim_params.sim_steps}",
+            f"{self.molecule}_{time.strftime('%Y-%m-%d_%H-%M-%S')}_s{sim_params.sim_steps}_d{depth}",
         )
         os.makedirs(tmp_dir)
 
