@@ -5,6 +5,7 @@ import shutil
 import re
 from util.constants import PYMOL_PYTHON_VERSION, ENTRY_NAME, WIZARD_NAME
 import json
+import zipfile
 
 wizard_root = Path(__file__).parent.parent
 
@@ -39,7 +40,7 @@ if current_env is None:
     exit(1)
 
 print(
-    f"You are currently about to install the plugin in the {current_env} environment. Do you wish to continue? (y/N)"
+    f"You are currently about to install the wizard in the {current_env} environment. Do you wish to continue? (y/N)"
 )
 try:
     answer = input().strip().lower() or "n"
@@ -147,7 +148,10 @@ except shutil.Error as e:
     print(f"Failed to copy files: {e}")
     exit(1)
 
-# TODO install plugin
+settings_plugin_archive = "settings_plugin"
+shutil.make_archive(
+    settings_plugin_archive, "zip", os.path.join(f"{wizard_root}", "plugin")
+)
 
 print("Adding menu entries...")
 # Edit the openvr wizard to add a menu item in the internal menu
@@ -170,3 +174,6 @@ add_line_after(
 
 print("Done!")
 print(f"Remember to activate the {current_env} conda environment before running PyMOL.")
+print(
+    f"The plugin for changing wizard settings is located at {os.path.join(wizard_root, settings_plugin_archive)} and can be installed through PyMOL's plugin manager."
+)
