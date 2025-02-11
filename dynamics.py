@@ -1,5 +1,5 @@
 import os
-from enum import IntEnum
+from enum import Enum, IntEnum, auto
 import threading
 import time
 
@@ -37,11 +37,16 @@ def load_configuration():
 class WizardState(IntEnum):
     """The possible states of the wizard."""
 
-    INITIALIZING = 0
-    READY = 1
-    MOLECULE_SELECTED = 2
-    RUNNING_SIMULATION = 3
-    SIMULATION_COMPLETE = 4
+    INITIALIZING = auto()
+    READY = auto()
+    MOLECULE_SELECTED = auto()
+    RUNNING_SIMULATION = auto()
+    SIMULATION_COMPLETE = auto()
+
+
+class SimulationType(Enum):
+    ALL_ATOM = auto()
+    COARSE = auto()
 
 
 class Residue:
@@ -65,8 +70,10 @@ class Dynamics(Wizard):
         self.status = WizardState.INITIALIZING
         self.molecule = None
         self.sim_depth = 2
+        self.sim_type = SimulationType.ALL_ATOM
         self.populate_molecule_choices()
         self.populate_sim_depth_choices()
+        self.populate_sim_type_choices()
         self.status = WizardState.READY
 
     def get_prompt(self):
@@ -95,8 +102,9 @@ class Dynamics(Wizard):
             molecule_label = self.molecule
 
         depth_label = f"Neighbourhood: {self.sim_depth}"
+        sim_type_label = f"Simulation type: {self.sim_type.name}"
 
-        options = [[1, "Molecular Dynamics", ""]]
+        options = [[1, "Molecular Dynamics", ""], [3, sim_type_label, "sim_type"]]
 
         if self.status >= WizardState.READY:
             options.extend(
@@ -140,6 +148,19 @@ class Dynamics(Wizard):
                 ]
             )
 
+    def populate_sim_type_choices(self):
+        """Populate the menu with the possible values for the type of simulation to perform."""
+
+        self.menu["sim_type"] = [[2, "Simulation Type", ""]]
+        for sim_type in SimulationType:
+            self.menu["sim_type"].append(
+                [
+                    1,
+                    sim_type.name,
+                    'cmd.get_wizard().set_sim_type("' + sim_type.name + '")',
+                ]
+            )
+
     def set_molecule(self, molecule):
         """Set the molecule to simulate."""
 
@@ -151,6 +172,15 @@ class Dynamics(Wizard):
         """Set the depth of the paratope neighbourhood to simulate."""
 
         self.sim_depth = depth
+        cmd.refresh_wizard()
+
+    def set_sim_type(self, sim_type_str):
+        """Set the type of simulation to perform."""
+
+        if sim_type_str == "ALL_ATOM":
+            self.sim_type = SimulationType.ALL_ATOM
+        elif sim_type_str == "COARSE":
+            self.sim_type = SimulationType.COARSE
         cmd.refresh_wizard()
 
     def run(self):
