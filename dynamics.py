@@ -228,10 +228,21 @@ class Dynamics(Wizard):
             cmd.refresh_wizard()
             return
 
+        self.select_epitope(
+            self.molecule, f"{self.molecule}_paratope", f"{self.molecule}_epitope"
+        )
+
         paratope_residues = set()
         cmd.iterate(
             f"{self.molecule}_paratope",
             "paratope_residues.add((resi, chain))",
+            space=locals(),
+        )
+
+        epitope_residues = set()
+        cmd.iterate(
+            f"{self.molecule}_epitope",
+            "epitope_residues.add((resi, chain))",
             space=locals(),
         )
 
@@ -242,10 +253,23 @@ class Dynamics(Wizard):
             depth,
         )
 
-        # Obtain a further extended neighbourhood that will have its atoms locked
-        locked_neigh_residues = self.get_neigbourhood(
-            f"{self.molecule}_locked_neigh",
+        # Obtain a further extended neighbourhood of the paratope that will have its atoms locked
+        locked_paratope_neigh_residues = self.get_neigbourhood(
+            f"{self.molecule}_locked_paratope_neigh",
             f"{self.molecule}_paratope_neigh",
+        )
+
+        # Get the neighbourhood of the epitope
+        epitope_neigh_residues = self.get_neigbourhood(
+            f"{self.molecule}_epitope_neigh",
+            f"{self.molecule}_epitope",
+            depth,
+        )
+
+        # Obtain a further extended neighbourhood of the epitope that will have its atoms locked
+        locked_epitope_neigh_residues = self.get_neigbourhood(
+            f"{self.molecule}_locked_epitope_neigh",
+            f"{self.molecule}_epitope_neigh",
         )
 
         # Create a new object out of the non-simulated atoms
@@ -255,7 +279,7 @@ class Dynamics(Wizard):
         # align the final trajaectory with the original structure
         cmd.select(
             name=non_sim_molecule_sel,
-            selection=f"byres {self.molecule} and not {self.molecule}_paratope_neigh",
+            selection=f"byres {self.molecule} and not {self.molecule}_paratope_neigh and not {self.molecule}_epitope_neigh",
         )
         cmd.create(non_sim_molecule, non_sim_molecule_sel)
         cmd.delete(non_sim_molecule_sel)
@@ -267,8 +291,15 @@ class Dynamics(Wizard):
             json.dump(
                 {
                     "paratope": list(paratope_residues),
-                    "neighbourhood": list(paratope_neigh_residues),
-                    "locked": list(locked_neigh_residues),
+                    "paratope_neighbourhood": list(paratope_neigh_residues),
+                    "oaratope_locked_paratope_neighbourhood": list(
+                        locked_paratope_neigh_residues
+                    ),
+                    "epitope": list(paratope_residues),
+                    "epitope_neighbourhood": list(epitope_neigh_residues),
+                    "epitope_locked_paratope_neighbourhood": list(
+                        locked_epitope_neigh_residues
+                    ),
                     "depth": depth,
                 },
                 f,
@@ -279,7 +310,7 @@ class Dynamics(Wizard):
             # but the residue ids are preserved
             simulation.slice_object(
                 self.molecule,
-                locked_neigh_residues,
+                locked_paratope_neigh_residues.union(locked_epitope_neigh_residues),
             )
 
             to_fix = f"{self.molecule}_sliced"
@@ -295,14 +326,24 @@ class Dynamics(Wizard):
         cmd.show_as("licorice", final_molecule)
 
         # Remove overlap
-        locked_neigh_residues = locked_neigh_residues - paratope_neigh_residues
+        locked_paratope_neigh_residues = (
+            locked_paratope_neigh_residues - paratope_neigh_residues
+        )
         paratope_neigh_residues = paratope_neigh_residues - paratope_residues
+
+        locked_epitope_neigh_residues = (
+            locked_epitope_neigh_residues - epitope_neigh_residues
+        )
+        epitope_neigh_residues = epitope_neigh_residues - epitope_residues
 
         # Run the simulation
         simulation.simulate(
             final_molecule,
             simulation.residues_to_atoms(
-                final_molecule, paratope_residues.union(paratope_neigh_residues)
+                final_molecule,
+                paratope_residues.union(paratope_neigh_residues)
+                .union(epitope_residues)
+                .union(epitope_neigh_residues),
             ),
         )
         simulation.postprocess_output()
@@ -313,7 +354,7 @@ class Dynamics(Wizard):
         # Colour the residues
         cmd.color("grey", f"{output_name}")
 
-        for resi, chain in locked_neigh_residues:
+        for resi, chain in locked_paratope_neigh_residues:
             cmd.color("red", f"{output_name} and resi {resi} and chain {chain}")
 
         for resi, chain in paratope_neigh_residues:
@@ -321,6 +362,15 @@ class Dynamics(Wizard):
 
         for resi, chain in paratope_residues:
             cmd.color("green", f"{output_name} and resi {resi} and chain {chain}")
+
+        for resi, chain in locked_epitope_neigh_residues:
+            cmd.color("magenta", f"{output_name} and resi {resi} and chain {chain}")
+
+        for resi, chain in epitope_neigh_residues:
+            cmd.color("cyan", f"{output_name} and resi {resi} and chain {chain}")
+
+        for resi, chain in epitope_residues:
+            cmd.color("yellow", f"{output_name} and resi {resi} and chain {chain}")
 
         cmd.align(output_name, self.molecule)
         cmd.zoom(output_name)
@@ -336,7 +386,7 @@ class Dynamics(Wizard):
             # Remove selections
             cmd.delete(f"{self.molecule}_paratope")
             cmd.delete(f"{self.molecule}_paratope_neigh")
-            cmd.delete(f"{self.molecule}_locked_neigh")
+            cmd.delete(f"{self.molecule}_locked_paratope_neigh")
 
         self.status = WizardState.SIMULATION_COMPLETE
         cmd.refresh_wizard()
@@ -372,3 +422,12 @@ class Dynamics(Wizard):
         cmd.get_wizard().run()
         cmd.get_wizard().toggle_label_pos()
         cmd.set_wizard()
+
+    def select_epitope(self, molecule, paratope_sel, selection_name):
+        """Get the residues of the epitope based on the paratope selection."""
+
+        epitope_sel = selection_name
+        cmd.select(
+            name=epitope_sel,
+            selection=f"{molecule} and not chain H and not chain L near_to 6.0 of {paratope_sel}",
+        )

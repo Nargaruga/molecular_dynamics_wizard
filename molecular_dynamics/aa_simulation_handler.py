@@ -13,18 +13,6 @@ from pymol import cmd
 from .simulation_handler import SimulationHandler
 from .simulation_params import SimulationParameters
 
-
-# class ResidueAcceptor(Bio.PDB.Select):
-#     def __init__(self, to_accept):
-#         self.to_accept = to_accept
-
-#     def accept_residue(self, residue: Residue):
-#         a, b, c = residue.id
-#         print(residue.id)
-#         print(str(a) + str(b) + str(c))
-#         return str(a) + str(b) + str(c) in self.to_accept
-
-
 class AllAtomSimulationHandler(SimulationHandler):
     def __init__(self, tmp_dir, parameters: SimulationParameters):
         self.tmp_dir = tmp_dir
