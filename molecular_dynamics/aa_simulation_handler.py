@@ -58,7 +58,7 @@ class AllAtomSimulationHandler(SimulationHandler):
         selection = ""
         for resi, chain in residues_to_keep:
             selection = "selection_to_keep"
-            cmd.select("selection_to_keep", f"resi {resi} and chain {chain}", merge=1)
+            cmd.select("selection_to_keep", f"{molecule} and resi {resi} and chain {chain}", merge=1)
 
         cmd.create(f"{molecule}_sliced", selection)
         cmd.delete(selection)
