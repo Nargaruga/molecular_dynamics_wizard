@@ -312,9 +312,10 @@ class Dynamics(Wizard):
             )
 
             to_fix = f"{self.molecule}_sliced"
-            cmd.save(os.path.join(tmp_dir, f"{to_fix}.pdb"), to_fix)
         else:
             to_fix = self.molecule
+
+        cmd.save(os.path.join(tmp_dir, f"{to_fix}.pdb"), to_fix)
 
         final_molecule = f"{self.molecule}_fixed"
         simulation.preprocess_input(to_fix, f"{final_molecule}.pdb")
