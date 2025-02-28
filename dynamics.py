@@ -250,6 +250,7 @@ class Dynamics(Wizard):
         paratope_neigh_residues = self.get_neigbourhood(
             f"{self.molecule}_paratope_neigh",
             f"{self.molecule}_paratope",
+            "chain H or chain L",
             depth,
         )
 
@@ -257,12 +258,14 @@ class Dynamics(Wizard):
         locked_paratope_neigh_residues = self.get_neigbourhood(
             f"{self.molecule}_locked_paratope_neigh",
             f"{self.molecule}_paratope_neigh",
+            "chain H or chain L",
         )
 
         # Get the neighbourhood of the epitope
         epitope_neigh_residues = self.get_neigbourhood(
             f"{self.molecule}_epitope_neigh",
             f"{self.molecule}_epitope",
+            "not chain H and not chain L",
             depth,
         )
 
@@ -270,6 +273,7 @@ class Dynamics(Wizard):
         locked_epitope_neigh_residues = self.get_neigbourhood(
             f"{self.molecule}_locked_epitope_neigh",
             f"{self.molecule}_epitope_neigh",
+            "not chain H and not chain L",
         )
 
         # Create a new object out of the non-simulated atoms
@@ -304,6 +308,7 @@ class Dynamics(Wizard):
             )
 
         if sim_params.remove_non_simulated:
+            print("Removing non-simulated atoms...")
             # This operation causes the renumbering of all atoms,
             # but the residue ids are preserved
             simulation.slice_object(
@@ -392,17 +397,22 @@ class Dynamics(Wizard):
 
         print(f"Done! Simulation files saved at {tmp_dir}")
 
-    def get_neigbourhood(self, selection_name, target_name, depth=1):
+    def get_neigbourhood(self, selection_name, target_name, chains, depth=1):
         residues = set()
-        current_selection = target_name
-        for _ in range(depth):
-            cmd.select(
-                name=selection_name,
-                selection=f"byres (neighbor {current_selection}) or {current_selection}",
-                merge=1,
-            )
 
-            current_selection = selection_name
+        if depth == 0:
+            cmd.select(name=selection_name, selection=target_name)
+        else:
+            current_selection = target_name
+
+            for _ in range(depth):
+                cmd.select(
+                    name=selection_name,
+                    selection=f"byres ((neighbor {current_selection}) or {current_selection}) and ({chains})",
+                    merge=1,
+                )
+
+                current_selection = selection_name
 
         cmd.iterate(
             selection_name,
