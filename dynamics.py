@@ -290,23 +290,6 @@ class Dynamics(Wizard):
         cmd.align(non_sim_molecule, self.molecule)
         cmd.disable(non_sim_molecule)
 
-        # Save residue ids to json
-        with open(os.path.join(tmp_dir, "simulated_residues.json"), "w") as f:
-            json.dump(
-                {
-                    "paratope": list(paratope_residues),
-                    "paratope_neighbourhood": list(paratope_neigh_residues),
-                    "locked_paratope_neighbourhood": list(
-                        locked_paratope_neigh_residues
-                    ),
-                    "epitope": list(epitope_residues),
-                    "epitope_neighbourhood": list(epitope_neigh_residues),
-                    "locked_epitope_neighbourhood": list(locked_epitope_neigh_residues),
-                    "depth": depth,
-                },
-                f,
-            )
-
         if sim_params.remove_non_simulated:
             print("Removing non-simulated atoms...")
             # This operation causes the renumbering of all atoms,
@@ -339,6 +322,23 @@ class Dynamics(Wizard):
             locked_epitope_neigh_residues - epitope_neigh_residues
         )
         epitope_neigh_residues = epitope_neigh_residues - epitope_residues
+
+        # Save residue ids to json
+        with open(os.path.join(tmp_dir, "simulated_residues.json"), "w") as f:
+            json.dump(
+                {
+                    "paratope": list(paratope_residues),
+                    "paratope_neighbourhood": list(paratope_neigh_residues),
+                    "locked_paratope_neighbourhood": list(
+                        locked_paratope_neigh_residues
+                    ),
+                    "epitope": list(epitope_residues),
+                    "epitope_neighbourhood": list(epitope_neigh_residues),
+                    "locked_epitope_neighbourhood": list(locked_epitope_neigh_residues),
+                    "depth": depth,
+                },
+                f,
+            )
 
         # Run the simulation
         simulation.simulate(
