@@ -77,8 +77,15 @@ def main():
         with open(constraints_file, "r") as file:
             data = json.load(file)
             paratope = lists_to_tuples(data["paratope"])
-            neighbourhood = lists_to_tuples(data["neighbourhood"])
-            locked = lists_to_tuples(data["locked"])
+            paratope_neighbourhood = lists_to_tuples(data["paratope_neighbourhood"])
+            locked_paratope_neighbourhood = lists_to_tuples(
+                data["locked_paratope_neighbourhood"]
+            )
+            epitope = lists_to_tuples(data["epitope"])
+            epitope_neighbourhood = lists_to_tuples(data["epitope_neighbourhood"])
+            locked_epitope_neighbourhood = lists_to_tuples(
+                data["locked_epitope_neighbourhood"]
+            )
             depth = data["depth"]
 
         tmp_dir = setup_tmp_dir(molecule, params, f"d{depth}")
