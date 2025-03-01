@@ -135,7 +135,7 @@ try:
     )
     shutil.copy(
         os.path.join(wizard_root, "installation_data.json"),
-        os.path.join(wizard_root, "plugin", "installation_data.json"),
+        os.path.join(wizard_root, "dynamics_settings_plugin", "installation_data.json"),
     )
 
     shutil.copytree(
@@ -149,7 +149,7 @@ except shutil.Error as e:
 
 settings_plugin_archive = "settings_plugin"
 shutil.make_archive(
-    settings_plugin_archive, "zip", os.path.join(f"{wizard_root}"), "plugin"
+    settings_plugin_archive, "zip", os.path.join(f"{wizard_root}"), "dynamics_settings_plugin"
 )
 
 print("Adding menu entries...")
