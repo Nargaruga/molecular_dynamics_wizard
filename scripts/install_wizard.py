@@ -5,7 +5,6 @@ import shutil
 import re
 from util.constants import PYMOL_PYTHON_VERSION, ENTRY_NAME, WIZARD_NAME
 import json
-import zipfile
 
 wizard_root = Path(__file__).parent.parent
 

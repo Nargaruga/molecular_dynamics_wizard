@@ -90,7 +90,11 @@ def main():
 
         tmp_dir = setup_tmp_dir(molecule, params, f"d{depth}")
         simulate_partial_molecule(
-            tmp_dir, molecule, params, set(paratope + neighbourhood), set(locked)
+            tmp_dir,
+            molecule,
+            params,
+            set(paratope + paratope_neighbourhood + epitope + epitope_neighbourhood),
+            set(locked_paratope_neighbourhood + locked_epitope_neighbourhood),
         )
 
     except IndexError:

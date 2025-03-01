@@ -299,7 +299,7 @@ class Dynamics(Wizard):
                     "locked_paratope_neighbourhood": list(
                         locked_paratope_neigh_residues
                     ),
-                    "epitope": list(paratope_residues),
+                    "epitope": list(epitope_residues),
                     "epitope_neighbourhood": list(epitope_neigh_residues),
                     "locked_epitope_neighbourhood": list(locked_epitope_neigh_residues),
                     "depth": depth,
