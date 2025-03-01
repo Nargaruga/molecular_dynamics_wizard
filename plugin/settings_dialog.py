@@ -1,13 +1,17 @@
 import os
 import json
+from pathlib import Path
 
 from pymol.Qt import QtWidgets
 
 from .settings_gui import Ui_Form
 from molecular_dynamics.simulation_params import SimulationParameters
 
+plugin_root = Path(__file__).parent
+
 # global reference to avoid garbage collection of our dialog
 dialog = None
+
 
 def run_plugin_gui():
     global dialog
@@ -24,7 +28,7 @@ def run_plugin_gui():
 
 
 def get_configuration_path():
-    install_data_path = "installation_data.json"
+    install_data_path = os.path.join(plugin_root, "installation_data.json")
     with open(install_data_path) as f:
         data = json.load(f)
         try:
