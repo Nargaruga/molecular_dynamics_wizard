@@ -403,16 +403,11 @@ class Dynamics(Wizard):
         if depth == 0:
             cmd.select(name=selection_name, selection=target_name)
         else:
-            current_selection = target_name
-
-            for _ in range(depth):
-                cmd.select(
-                    name=selection_name,
-                    selection=f"byres ((neighbor {current_selection}) or {current_selection}) and ({chains})",
-                    merge=1,
-                )
-
-                current_selection = selection_name
+            cmd.select(
+                name=selection_name,
+                selection=f"byres {target_name} extend {depth} and ({chains})",
+                merge=1,
+            )
 
         cmd.iterate(
             selection_name,
@@ -438,5 +433,5 @@ class Dynamics(Wizard):
         epitope_sel = selection_name
         cmd.select(
             name=epitope_sel,
-            selection=f"{molecule} and not chain H and not chain L near_to 6.0 of {paratope_sel}",
+            selection=f"byres {molecule} and not chain H and not chain L near_to 6.0 of {paratope_sel}",
         )
