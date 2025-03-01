@@ -149,7 +149,7 @@ except shutil.Error as e:
 
 settings_plugin_archive = "settings_plugin"
 shutil.make_archive(
-    settings_plugin_archive, "zip", os.path.join(f"{wizard_root}", "plugin")
+    settings_plugin_archive, "zip", os.path.join(f"{wizard_root}"), "plugin"
 )
 
 print("Adding menu entries...")
