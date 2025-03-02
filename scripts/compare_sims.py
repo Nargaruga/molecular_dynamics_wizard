@@ -13,7 +13,13 @@ from MDAnalysis.analysis import rms, align
 
 buttons = []
 
-def average_rmsd(runs, n_frames: int) -> list[int]:
+
+class NoSimulationsException(Exception):
+    def __init__(self, msg):
+        self.msg = msg
+
+
+def average_rmsd(runs: list[rms.RMSD], n_frames: int) -> list[int]:
     if len(runs) < 1:
         return []
 
@@ -30,6 +36,9 @@ def plot_rmsd(
     str_depths: list[str],
     n_frames: int,
 ):
+    if not rmsd_by_depth or not str_depths:
+        return
+
     for rmsd in rmsd_by_depth:
         ax.plot(
             [x + 1 for x in range(0, n_frames)],
@@ -40,7 +49,10 @@ def plot_rmsd(
     ax.set_ylabel("RMSD (Å)")
 
 
-def compute_rmsf(topology, trajectory, selection_str):
+def compute_rmsf(topology: str, trajectory: str, selection_str: str):
+    if topology == "" or trajectory == "":
+        return None
+
     u = mda.Universe(topology, trajectory)
 
     average = align.AverageStructure(
@@ -60,6 +72,9 @@ def compute_rmsf(topology, trajectory, selection_str):
 def average_rmsf(
     runs: list[tuple[rms.RMSF, mda.AtomGroup]],
 ) -> tuple[list[float], mda.AtomGroup]:
+    if not runs:
+        return [], mda.AtomGroup()
+
     rmsf_tot = np.zeros_like(runs[0][0].results.rmsf)
     for rmsf, _ in runs:
         rmsf_tot += np.array(rmsf.results.rmsf)
@@ -72,6 +87,9 @@ def plot_rmsf(
     rmsf_by_depth: list[tuple[list[float], mda.AtomGroup]],
     str_depths: list[str],
 ):
+    if not rmsf_by_depth or not str_depths:
+        return
+
     for rmsf, c_alphas in rmsf_by_depth:
         ax.plot(c_alphas.resids, rmsf, linestyle="--", marker="o")
 
@@ -82,7 +100,10 @@ def plot_rmsf(
     ax.set_ylabel("RMSF (Å)")
 
 
-def annotate_rmsf(ax: Axes, rmsf_by_depth):
+def annotate_rmsf(ax: Axes, rmsf_by_depth: list[tuple[list[float], mda.AtomGroup]]):
+    if not rmsf_by_depth:
+        return
+
     for rmsf, c_alphas in rmsf_by_depth:
         for xy in zip(c_alphas.resids, rmsf):
             ax.annotate("(%s, %.2f)" % xy, xy=xy, textcoords="data")
@@ -103,6 +124,9 @@ def toggle_annotation(ax: Axes, rmsf_by_depth):
 
 
 def plot_duration(ax: Axes, entries: list[int], depths: list[int]):
+    if not entries or not depths:
+        return
+
     ax.bar(
         depths,
         entries,
@@ -133,6 +157,9 @@ def process_directory(
 
     # process all simulations performed with this neighbourhood depth
     sim_dirs = [f.path for f in os.scandir(dir) if f.is_dir() and f.name != "ignore"]
+    if not sim_dirs:
+        raise NoSimulationsException(f"No simulations found in {dir}")
+
     for sim_dir in sim_dirs:
         print(f"Processing simulation {sim_dir}")
 
@@ -165,12 +192,11 @@ def process_directory(
         )
 
     # compute averages over multiple runs
-    avg_duration = sum(durations) / len(durations)
+    avg_duration = sum(durations) / max(len(durations), 1)
     avg_rmsd = average_rmsd(rmsd_runs, frames)
     avg_rmsd_static = average_rmsd(rmsd_static_runs, frames)
     avg_rmsf_h = average_rmsf(rmsf_h_runs)
     avg_rmsf_l = average_rmsf(rmsf_l_runs)
-
 
     cmd.load(os.path.join(sim_dirs[0], "ready.pdb"), f"sim_d{depth}")
     cmd.load(os.path.join(sim_dirs[0], "trajectory.dcd"), f"sim_d{depth}")
@@ -204,7 +230,7 @@ def compare_sims(molecule_name: str, n_frames_str: str):
 
     minimized = mda.Universe(os.path.join(molecule_dir, "minimized.pdb"))
 
-    with open(os.path.join(molecule_dir, "paratope.json")) as f:
+    with open(os.path.join(molecule_dir, "interaction_zone.json")) as f:
         sim_metadata = json.load(f)
         paratope_residues = sim_metadata["paratope"]
 
@@ -243,26 +269,36 @@ def compare_sims(molecule_name: str, n_frames_str: str):
     dirs = [
         f.path for f in os.scandir(molecule_dir) if f.is_dir() and f.name != "ignore"
     ]
+    if not dirs:
+        print("No simulation directories found")
+        return
+
     for i, dir in enumerate(dirs):
         # we assume that the directory name corresponds to the simulation depth
         depth = os.path.basename(dir)
+        try:
+            (
+                avg_duration,
+                avg_rmsd,
+                avg_rmsd_static,
+                avg_rmsf_h,
+                avg_rmsf_l,
+            ) = process_directory(
+                full_sim,
+                minimized,
+                dir,
+                int(depth),
+                paratope_selection,
+                paratope_hc_selection,
+                paratope_lc_selection,
+                n_frames,
+            )
+        except NoSimulationsException as e:
+            print(e.msg)
+            continue
+
         str_depths.append(depth)
-        (
-            avg_duration,
-            avg_rmsd,
-            avg_rmsd_static,
-            avg_rmsf_h,
-            avg_rmsf_l,
-        ) = process_directory(
-            full_sim,
-            minimized,
-            dir,
-            int(depth),
-            paratope_selection,
-            paratope_hc_selection,
-            paratope_lc_selection,
-            n_frames,
-        )
+
         avg_durations.append(avg_duration)
         avg_rmsd_by_depth.append(avg_rmsd)
         avg_rmsd_by_depth_static.append(avg_rmsd_static)
@@ -278,6 +314,8 @@ def compare_sims(molecule_name: str, n_frames_str: str):
         os.path.join(molecule_dir, "full_trajectory.dcd"),
         paratope_hc_selection,
     )
+    if not rmsf_h_full:
+        return
     avg_rmsf_h_by_depth.append(average_rmsf([rmsf_h_full]))
 
     rmsf_l_full = compute_rmsf(
@@ -285,6 +323,8 @@ def compare_sims(molecule_name: str, n_frames_str: str):
         os.path.join(molecule_dir, "full_trajectory.dcd"),
         paratope_lc_selection,
     )
+    if not rmsf_l_full:
+        return
     avg_rmsf_l_by_depth.append(average_rmsf([rmsf_l_full]))
 
     # get the time needed for the full simulation
@@ -317,9 +357,7 @@ def compare_sims(molecule_name: str, n_frames_str: str):
     rmsf_ax_h.set_title("RMSF of the paratope on H")
     ax_rmsf_h = fig_rmsf_h.add_axes((0.7, 0.05, 0.1, 0.075))
     btn_rmsf_h = Button(ax_rmsf_h, "Annotate")
-    btn_rmsf_h.on_clicked(
-        lambda _: toggle_annotation(rmsf_ax_h, avg_rmsf_h_by_depth)
-    )
+    btn_rmsf_h.on_clicked(lambda _: toggle_annotation(rmsf_ax_h, avg_rmsf_h_by_depth))
     buttons.append(btn_rmsf_h)
     plot_rmsf(rmsf_ax_h, avg_rmsf_h_by_depth, str_depths)
 
@@ -328,9 +366,7 @@ def compare_sims(molecule_name: str, n_frames_str: str):
     rmsf_ax_l.set_title("RMSF of the paratope on L")
     ax_rmsf_l = fig_rmsf_l.add_axes((0.7, 0.05, 0.1, 0.075))
     btn_rmsf_l = Button(ax_rmsf_l, "Annotate")
-    btn_rmsf_l.on_clicked(
-        lambda _: toggle_annotation(rmsf_ax_l, avg_rmsf_l_by_depth)
-    )
+    btn_rmsf_l.on_clicked(lambda _: toggle_annotation(rmsf_ax_l, avg_rmsf_l_by_depth))
     buttons.append(btn_rmsf_l)
     plot_rmsf(rmsf_ax_l, avg_rmsf_l_by_depth, str_depths)
 
