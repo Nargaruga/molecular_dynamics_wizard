@@ -220,9 +220,9 @@ class Dynamics(Wizard):
         # Get all residues in the paratope
         try:
             self.identify_paratope(self.molecule, f"{self.molecule}_paratope")
-        except Exception as _:
+        except Exception as e:
             cmd.set_wizard()
-            print("Could not identify the paratope. Is the molecule an antibody?")
+            print(f"Error while identifying the paratope: {e}.")
             self.status = WizardState.READY
             cmd.refresh_wizard()
             return
