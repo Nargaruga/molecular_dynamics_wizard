@@ -11,11 +11,6 @@ from pymol import cmd
 from .molecular_dynamics.aa_simulation_handler import AllAtomSimulationHandler
 from .molecular_dynamics.simulation_params import SimulationParameters
 
-# TODO
-WIZARD_ROOT = (
-    "/home/leo/anaconda3/envs/md_test/lib/python3.9/site-packages/pymol/wizard/"
-)
-
 def load_configuration():
     params = SimulationParameters()
 
@@ -32,6 +27,11 @@ def load_configuration():
 
     return params
 
+def get_wizard_root():
+    install_data_path = os.path.join("dynamics_extra", "installation_data.json")
+    with open(install_data_path) as f:
+        data = json.load(f)
+        return data["installed_wizard_dir"]
 
 class WizardState(IntEnum):
     """The possible states of the wizard."""
@@ -61,7 +61,7 @@ class Dynamics(Wizard):
 
     def __init__(self, _self=cmd):
         Wizard.__init__(self, _self)
-        os.chdir(WIZARD_ROOT)
+        os.chdir(get_wizard_root())
 
         cmd.set("retain_order", 1)
         cmd.set("pdb_retain_ids", 1)

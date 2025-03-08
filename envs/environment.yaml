@@ -8,6 +8,7 @@ dependencies:
   - pdbfixer
   - pyqt
   - python=3.9
+  - glew
   - libpng
   - libnetcdf
   - openmm
