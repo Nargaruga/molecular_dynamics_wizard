@@ -1,3 +1,6 @@
 [submodule "ext/pymol_wizard_installer"]
 	path = ext/pymol_wizard_installer
 	url = git@github.com:Nargaruga/pymol_wizard_installer.git
+[submodule "ext/paratope_heatmap_wizard"]
+	path = ext/paratope_heatmap_wizard
+	url = git@github.com:Nargaruga/paratope_heatmap_wizard.git
