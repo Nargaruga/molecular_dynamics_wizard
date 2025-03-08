@@ -16,4 +16,4 @@ martini_parameters
 
 ext/martini_openmm
 
-installation_data.yaml
+installation_data.json
