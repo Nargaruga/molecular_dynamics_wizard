@@ -15,4 +15,4 @@ ext
 martini_parameters
 *coarse_simulation_handler.py
 
-installation_data.json
+installation_data.yaml
