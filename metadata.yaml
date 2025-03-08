@@ -1,6 +1,6 @@
 name: dynamics
 menu_entry: "Molecular Dynamics"
-default_env: pymol_antibody_evo
+default_env: pymol_molecular_dynamics
 use_vr: true
 
 python_version: 3.9
@@ -12,4 +12,4 @@ extra_dirs:
   - extra
 
 pre_script: ""
-post_script: "scripts/finalize_installation.py"
+post_script: "scripts/installation/post_install.py"
