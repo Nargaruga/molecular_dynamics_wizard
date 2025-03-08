@@ -1,0 +1,3 @@
+[submodule "ext/pymol_wizard_installer"]
+	path = ext/pymol_wizard_installer
+	url = git@github.com:Nargaruga/pymol_wizard_installer.git

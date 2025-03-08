@@ -1,7 +1,6 @@
 import yaml
 
 
-
 class SimulationParameters:
     # Preprocessing
     add_solvent: bool = False
@@ -13,8 +12,8 @@ class SimulationParameters:
     # Equilibration
     nvt_steps: int = 1000
     npt_steps: int = 1000
-    eq_pressure: float = 1.0 # bar
-    eq_temperature: float = 300.0 # kelvin
+    eq_pressure: float = 1.0  # bar
+    eq_temperature: float = 300.0  # kelvin
 
     # Simulation
     force_field: str = "charmm36.xml"
@@ -22,9 +21,9 @@ class SimulationParameters:
     sim_steps: int = 100000
 
     # Integrator
-    temperature: float = 300.0 # kelvin
-    friction_coeff: float = 1.0 # 1/picosecond
-    timestep: float = 2.0 # femtosecond
+    temperature: float = 300.0  # kelvin
+    friction_coeff: float = 1.0  # 1/picosecond
+    timestep: float = 2.0  # femtosecond
 
     # Reporters
     report_interval: int = 1000
@@ -59,13 +58,13 @@ class SimulationParameters:
                 self.nvt_steps = config["nvt_steps"]
                 self.npt_steps = config["npt_steps"]
                 self.eq_pressure = config["eq_pressure"]
-                self.eq_temperature = config["eq_temperature"] 
+                self.eq_temperature = config["eq_temperature"]
 
                 self.force_field = config["force_field"]
                 self.water_model = config["water_model"]
                 self.sim_steps = config["sim_steps"]
 
-                self.temperature = config["temperature"] 
+                self.temperature = config["temperature"]
                 self.friction_coeff = config["friction_coeff"]
                 self.timestep = config["timestep"]
 

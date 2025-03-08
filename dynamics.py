@@ -16,7 +16,6 @@ WIZARD_ROOT = (
     "/home/leo/anaconda3/envs/md_test/lib/python3.9/site-packages/pymol/wizard/"
 )
 
-
 def load_configuration():
     params = SimulationParameters()
 

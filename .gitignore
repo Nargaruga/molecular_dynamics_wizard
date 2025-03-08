@@ -10,9 +10,10 @@
 inputs/
 tmp
 */test
-ext
 *old
 martini_parameters
 *coarse_simulation_handler.py
+
+ext/martini_openmm
 
 installation_data.yaml
