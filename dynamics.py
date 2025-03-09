@@ -2,7 +2,7 @@ import os
 from enum import Enum, IntEnum, auto
 import threading
 import time
-
+import pathlib
 import json
 
 from pymol.wizard import Wizard
@@ -11,27 +11,16 @@ from pymol import cmd
 from .molecular_dynamics.aa_simulation_handler import AllAtomSimulationHandler
 from .molecular_dynamics.simulation_params import SimulationParameters
 
-def load_configuration():
+def load_configuration(installed_wizard_path):
     params = SimulationParameters()
 
-    install_data_path = os.path.join("dynamics_extra", "installation_data.json")
-    with open(install_data_path) as f:
-        data = json.load(f)
-        try:
-            config_path = data["config_path"]
-            params.parse_file(os.path.join(config_path, "simulation_params.yaml"))
-        except KeyError:
-            print(
-                f"WARNING: Failed to read configuration file path from {install_data_path}, using default config."
-            )
+    config_path = os.path.join(installed_wizard_path, "dynamics_extra", "simulation_params.yaml")
+    params.parse_file(config_path)
 
     return params
 
-def get_wizard_root():
-    install_data_path = os.path.join("dynamics_extra", "installation_data.json")
-    with open(install_data_path) as f:
-        data = json.load(f)
-        return data["installed_wizard_dir"]
+def get_installed_wizard_path():
+    return pathlib.Path(__file__).parent.resolve()
 
 class WizardState(IntEnum):
     """The possible states of the wizard."""
@@ -61,7 +50,7 @@ class Dynamics(Wizard):
 
     def __init__(self, _self=cmd):
         Wizard.__init__(self, _self)
-        os.chdir(get_wizard_root())
+        os.chdir(get_installed_wizard_path())
 
         cmd.set("retain_order", 1)
         cmd.set("pdb_retain_ids", 1)
@@ -207,7 +196,7 @@ class Dynamics(Wizard):
             cmd.refresh_wizard()
             return
 
-        sim_params = load_configuration()
+        sim_params = load_configuration(get_installed_wizard_path())
 
         tmp_dir = os.path.join(
             "tmp",
