@@ -17,12 +17,25 @@ def main():
         "install_wizard.py",
     )
     paratope_wizard_root = os.path.join(wizard_root, "ext", "paratope_heatmap_wizard")
+
+    if os.name == "nt":
+        prefix = ["powershell.exe"]
+    else:
+        prefix = []
+
     try:
         subprocess.run(
-            [
-                f"conda run --no-capture-output -n {env_name} python3 {installer_path} {paratope_wizard_root}"
+            prefix
+            + [
+                "conda",
+                "run",
+                "--no-capture-output",
+                "-n",
+                env_name,
+                "python",
+                installer_path,
+                paratope_wizard_root,
             ],
-            shell=True,
             check=True,
         )
     except subprocess.CalledProcessError as e:
