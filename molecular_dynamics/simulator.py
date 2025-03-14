@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import os
+from pathlib import Path
 import shutil
 import time
 import sys
@@ -13,11 +14,12 @@ from .aa_simulation_handler import AllAtomSimulationHandler
 
 
 def simulate_partial_molecule(
-    tmp_dir, molecule_name, params, residues_to_simulate, residues_to_lock
+    tmp_dir, pdb_path, params, residues_to_simulate, residues_to_lock
 ):
     simulation = AllAtomSimulationHandler(tmp_dir, params)
-    cmd.load(os.path.join("inputs", f"{molecule_name}.pdb"))
+    cmd.load(pdb_path)
 
+    molecule_name = Path(pdb_path).stem
     to_fix = molecule_name
     if params.remove_non_simulated:
         residues_to_keep = residues_to_simulate.union(residues_to_lock)
@@ -48,13 +50,13 @@ def lists_to_tuples(lists):
     return [tuple(lst) for lst in lists]
 
 
-def setup_tmp_dir(molecule, params, extra=""):
+def setup_tmp_dir(pdb_path, params, extra=""):
     tmp_dir_path = os.path.join(
-        "tmp",
-        f"{molecule}_{time.strftime('%Y-%m-%d_%H-%M-%S')}_s{params.sim_steps}_{extra}",
+        "results",
+        f"{Path(pdb_path).stem}_{time.strftime('%Y-%m-%d_%H-%M-%S')}_s{params.sim_steps}_{extra}",
     )
     os.makedirs(tmp_dir_path)
-    shutil.copy(f"inputs/{molecule}.pdb", os.path.join(tmp_dir_path, f"{molecule}.pdb"))
+    shutil.copy(pdb_path, os.path.join(tmp_dir_path, Path(pdb_path).name))
 
     return tmp_dir_path
 
@@ -62,11 +64,11 @@ def setup_tmp_dir(molecule, params, extra=""):
 def main():
     if len(sys.argv) < 3:
         print(
-            "Usage: python simulator.py <molecule_name> <simulation_params_file> [constraints_file]"
+            "Usage: python simulator.py <pdb_path> <simulation_params_file> [constraints_file]"
         )
         exit(1)
 
-    molecule = sys.argv[1]
+    pdb_path = sys.argv[1]
 
     simulation_params_file = sys.argv[2]
     params = SimulationParameters()
@@ -88,18 +90,18 @@ def main():
             )
             depth = data["depth"]
 
-        tmp_dir = setup_tmp_dir(molecule, params, f"d{depth}")
+        tmp_dir = setup_tmp_dir(params, f"d{depth}")
         simulate_partial_molecule(
             tmp_dir,
-            molecule,
+            pdb_path,
             params,
             set(paratope + paratope_neighbourhood + epitope + epitope_neighbourhood),
             set(locked_paratope_neighbourhood + locked_epitope_neighbourhood),
         )
 
     except IndexError:
-        tmp_dir = setup_tmp_dir(molecule, params, "full")
-        simulate_full_molecule(tmp_dir, molecule, params)
+        tmp_dir = setup_tmp_dir(pdb_path, params, "full")
+        simulate_full_molecule(tmp_dir, Path(pdb_path).stem, params)
 
     print(f"Done! Simulation files saved at {tmp_dir}")
 
