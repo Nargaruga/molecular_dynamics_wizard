@@ -11,16 +11,21 @@ from pymol import cmd
 from .molecular_dynamics.aa_simulation_handler import AllAtomSimulationHandler
 from .molecular_dynamics.simulation_params import SimulationParameters
 
+
 def load_configuration(installed_wizard_path):
     params = SimulationParameters()
 
-    config_path = os.path.join(installed_wizard_path, "dynamics_extra", "simulation_params.yaml")
+    config_path = os.path.join(
+        installed_wizard_path, "dynamics_extra", "simulation_params.yaml"
+    )
     params.parse_file(config_path)
 
     return params
 
+
 def get_installed_wizard_path():
     return pathlib.Path(__file__).parent.resolve()
+
 
 class WizardState(IntEnum):
     """The possible states of the wizard."""
@@ -28,6 +33,7 @@ class WizardState(IntEnum):
     INITIALIZING = auto()
     READY = auto()
     MOLECULE_SELECTED = auto()
+    CHAINS_SELECTED = auto()
     RUNNING_SIMULATION = auto()
     SIMULATION_COMPLETE = auto()
 
@@ -57,6 +63,8 @@ class Dynamics(Wizard):
 
         self.status = WizardState.INITIALIZING
         self.molecule = None
+        self.heavy_chains = []
+        self.light_chains = []
         self.sim_depth = 2
         self.sim_type = SimulationType.ALL_ATOM
         self.populate_molecule_choices()
@@ -73,6 +81,8 @@ class Dynamics(Wizard):
         elif self.status == WizardState.READY:
             self.prompt = ["Select a molecule."]
         elif self.status == WizardState.MOLECULE_SELECTED:
+            self.prompt = [f"Select the heavy and light chains for {self.molecule}."]
+        elif self.status == WizardState.CHAINS_SELECTED:
             self.prompt = [f"Run to perform a simulation for {self.molecule}."]
         elif self.status == WizardState.RUNNING_SIMULATION:
             self.prompt = ["Running simulation, please wait..."]
@@ -99,7 +109,27 @@ class Dynamics(Wizard):
                 [[3, molecule_label, "molecule"], [3, depth_label, "sim_depth"]]
             )
 
+        heavy_chain_label = "Heavy Chains: "
+        if self.heavy_chains:
+            heavy_chain_label += ", ".join(self.heavy_chains)
+        else:
+            heavy_chain_label += "None"
+
+        light_chain_label = "Light Chains: "
+        if self.light_chains:
+            light_chain_label += ", ".join(self.light_chains)
+        else:
+            light_chain_label += "None"
+
         if self.status >= WizardState.MOLECULE_SELECTED:
+            options.extend(
+                [
+                    [3, heavy_chain_label, "heavy_chain"],
+                    [3, light_chain_label, "light_chain"],
+                ]
+            )
+
+        if self.status >= WizardState.CHAINS_SELECTED:
             options.append(
                 [2, "Run Simulation", "cmd.get_wizard().run()"],
             )
@@ -119,6 +149,34 @@ class Dynamics(Wizard):
                     1,
                     m,
                     'cmd.get_wizard().set_molecule("' + m + '")',
+                ]
+            )
+
+    def populate_chain_choices(self):
+        """Populate the menu with the available chains in the selected molecule."""
+
+        if self.molecule is None:
+            print("Please select a molecule.")
+            return
+
+        chains = cmd.get_chains(self.molecule)
+        self.menu["heavy_chain"] = [[2, "Heavy Chain", ""]]
+        for c in chains:
+            self.menu["heavy_chain"].append(
+                [
+                    1,
+                    c,
+                    'cmd.get_wizard().set_heavy_chain("' + c + '")',
+                ]
+            )
+
+        self.menu["light_chain"] = [[2, "Light Chain", ""]]
+        for c in chains:
+            self.menu["light_chain"].append(
+                [
+                    1,
+                    c,
+                    'cmd.get_wizard().set_light_chain("' + c + '")',
                 ]
             )
 
@@ -154,6 +212,33 @@ class Dynamics(Wizard):
 
         self.molecule = molecule
         self.status = WizardState.MOLECULE_SELECTED
+        self.populate_chain_choices()
+        cmd.refresh_wizard()
+
+    def set_heavy_chain(self, chain):
+        """Set the heavy chain to be used for the heatmap."""
+
+        if chain in self.heavy_chains:
+            self.heavy_chains.remove(chain)
+        else:
+            self.heavy_chains.append(chain)
+
+        if self.heavy_chains and self.light_chains:
+            self.status = WizardState.CHAINS_SELECTED
+
+        cmd.refresh_wizard()
+
+    def set_light_chain(self, chain):
+        """Set the light chain to be used for the heatmap."""
+
+        if chain in self.light_chains:
+            self.light_chains.remove(chain)
+        else:
+            self.light_chains.append(chain)
+
+        if self.heavy_chains and self.light_chains:
+            self.status = WizardState.CHAINS_SELECTED
+
         cmd.refresh_wizard()
 
     def set_sim_depth(self, depth):
@@ -211,7 +296,7 @@ class Dynamics(Wizard):
             self.identify_paratope(self.molecule, f"{self.molecule}_paratope")
         except Exception as e:
             cmd.set_wizard()
-            print(f"Error while identifying the paratope: {e}.")
+            print(f"Error while invoking the paratope wizard: {e}.")
             self.status = WizardState.READY
             cmd.refresh_wizard()
             return
@@ -238,7 +323,9 @@ class Dynamics(Wizard):
         paratope_neigh_residues = self.get_neigbourhood(
             f"{self.molecule}_paratope_neigh",
             f"{self.molecule}_paratope",
-            "chain H or chain L",
+            " or ".join(
+                [f"chain {chain}" for chain in self.heavy_chains + self.light_chains]
+            ),
             depth,
         )
 
@@ -246,14 +333,21 @@ class Dynamics(Wizard):
         locked_paratope_neigh_residues = self.get_neigbourhood(
             f"{self.molecule}_locked_paratope_neigh",
             f"{self.molecule}_paratope_neigh",
-            "chain H or chain L",
+            " or ".join(
+                [f"chain {chain}" for chain in self.heavy_chains + self.light_chains]
+            ),
         )
 
         # Get the neighbourhood of the epitope
         epitope_neigh_residues = self.get_neigbourhood(
             f"{self.molecule}_epitope_neigh",
             f"{self.molecule}_epitope",
-            "not chain H and not chain L",
+            " and ".join(
+                [
+                    f"not chain {chain}"
+                    for chain in self.heavy_chains + self.light_chains
+                ]
+            ),
             depth,
         )
 
@@ -261,7 +355,12 @@ class Dynamics(Wizard):
         locked_epitope_neigh_residues = self.get_neigbourhood(
             f"{self.molecule}_locked_epitope_neigh",
             f"{self.molecule}_epitope_neigh",
-            "not chain H and not chain L",
+            " and ".join(
+                [
+                    f"not chain {chain}"
+                    for chain in self.heavy_chains + self.light_chains
+                ]
+            ),
         )
 
         # Create a new object out of the non-simulated atoms
@@ -410,6 +509,10 @@ class Dynamics(Wizard):
 
         cmd.wizard("paratope")
         cmd.get_wizard().set_molecule(molecule)
+        for heavy_chain in self.heavy_chains:
+            cmd.get_wizard().set_heavy_chain(heavy_chain)
+        for light_chain in self.light_chains:
+            cmd.get_wizard().set_light_chain(light_chain)
         cmd.get_wizard().set_selection_name(selection_name)
         cmd.get_wizard().run()
         cmd.get_wizard().toggle_label_pos()
@@ -421,5 +524,14 @@ class Dynamics(Wizard):
         epitope_sel = selection_name
         cmd.select(
             name=epitope_sel,
-            selection=f"byres {molecule} and not chain H and not chain L near_to 6.0 of {paratope_sel}",
+            selection=f"byres {molecule} and not ("
+            + (
+                " or ".join(
+                    [
+                        f"chain {chain}"
+                        for chain in self.heavy_chains + self.light_chains
+                    ]
+                )
+            )
+            + f") near_to 6.0 of {paratope_sel}",
         )
