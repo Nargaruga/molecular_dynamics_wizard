@@ -3,7 +3,7 @@ import os
 from openmm.app.pdbfile import PDBFile
 from openmm.app import Simulation
 from openmm.openmm import LangevinIntegrator, MonteCarloBarostat
-from openmm.app import ForceField, NoCutoff
+from openmm.app import ForceField, CutoffNonPeriodic, HBonds
 from openmm.unit import kelvin, picosecond, femtosecond, nanometer, bar
 
 import pdbfixer
@@ -12,6 +12,7 @@ from pymol import cmd
 
 from .simulation_handler import SimulationHandler
 from .simulation_params import SimulationParameters
+
 
 class AllAtomSimulationHandler(SimulationHandler):
     def __init__(self, tmp_dir, parameters: SimulationParameters):
@@ -58,7 +59,11 @@ class AllAtomSimulationHandler(SimulationHandler):
         selection = ""
         for resi, chain in residues_to_keep:
             selection = "selection_to_keep"
-            cmd.select("selection_to_keep", f"{molecule} and resi {resi} and chain {chain}", merge=1)
+            cmd.select(
+                "selection_to_keep",
+                f"{molecule} and resi {resi} and chain {chain}",
+                merge=1,
+            )
 
         cmd.create(f"{molecule}_sliced", selection)
         cmd.delete(selection)
@@ -73,9 +78,9 @@ class AllAtomSimulationHandler(SimulationHandler):
 
         system = forcefield.createSystem(
             pdb.topology,
-            nonbondedMethod=NoCutoff,  # TODO: use cutoff!
-            # nonbondedCutoff=1.0 * nanometer,
-            constraints=None,
+            nonbondedMethod=CutoffNonPeriodic,
+            nonbondedCutoff=1.0 * nanometer,
+            constraints=HBonds,
         )
 
         integrator = LangevinIntegrator(
@@ -84,16 +89,18 @@ class AllAtomSimulationHandler(SimulationHandler):
             self.parameters.timestep * femtosecond,
         )
 
-        # constrained_atoms = set()
-        # for i in range(system.getNumConstraints()):
-        #     particle1, particle2, _ = system.getConstraintParameters(i)
-        #     constrained_atoms.add(particle1)
-        #     constrained_atoms.add(particle2)
+        constrained_atoms = set()
+        for i in range(system.getNumConstraints()):
+            particle1, particle2, _ = system.getConstraintParameters(i)
+            constrained_atoms.add(particle1)
+            constrained_atoms.add(particle2)
 
         if atoms_to_simulate is not None:
             for atom in pdb.topology.atoms():
-                if atom.index not in atoms_to_simulate:
-                    # and atom.index not in constrained_atoms:
+                if (
+                    atom.index not in atoms_to_simulate
+                    and atom.index not in constrained_atoms
+                ):
                     system.setParticleMass(atom.index, 0)
 
         simulation = Simulation(pdb.topology, system, integrator)
@@ -122,6 +129,8 @@ class AllAtomSimulationHandler(SimulationHandler):
 
         print("Running simulation...")
         simulation.step(self.parameters.sim_steps)
+
+        return constrained_atoms
 
     def postprocess_output(self):
         pass

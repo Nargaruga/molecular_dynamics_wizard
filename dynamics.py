@@ -428,7 +428,7 @@ class Dynamics(Wizard):
             )
 
         # Run the simulation
-        simulation.simulate(
+        constrained_atoms = simulation.simulate(
             final_molecule,
             simulation.residues_to_atoms(
                 final_molecule,
@@ -438,6 +438,18 @@ class Dynamics(Wizard):
             ),
         )
         simulation.postprocess_output()
+
+        constrained_residues = set()
+        for atom in constrained_atoms:
+            cmd.select(
+                "constrained_atoms",
+                f"byres {final_molecule} and index {atom}",
+            )
+        cmd.iterate(
+            "constrained_atoms",
+            "constrained_residues.add((resi, chain))",
+            space=locals(),
+        )
 
         output_name = final_molecule
         cmd.load_traj(os.path.join(tmp_dir, "trajectory.dcd"), output_name)
@@ -462,6 +474,9 @@ class Dynamics(Wizard):
 
         for resi, chain in epitope_residues:
             cmd.color("yellow", f"{output_name} and resi {resi} and chain {chain}")
+
+        for resi, chain in constrained_residues:
+            cmd.color("black", f"{output_name} and resi {resi} and chain {chain}")
 
         cmd.align(output_name, self.molecule)
         cmd.zoom(output_name)
