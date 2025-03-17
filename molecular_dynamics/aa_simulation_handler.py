@@ -4,7 +4,7 @@ from openmm.app.pdbfile import PDBFile
 from openmm.app import Simulation
 from openmm.openmm import LangevinIntegrator, MonteCarloBarostat
 from openmm.app import ForceField, CutoffNonPeriodic, HBonds
-from openmm.unit import kelvin, picosecond, femtosecond, nanometer, bar
+from openmm.unit import kelvin, picosecond, femtosecond, nanometer, bar, amu
 
 import pdbfixer
 
@@ -81,6 +81,7 @@ class AllAtomSimulationHandler(SimulationHandler):
             nonbondedMethod=CutoffNonPeriodic,
             nonbondedCutoff=1.0 * nanometer,
             constraints=HBonds,
+            hydrogenMass=1.5 * amu,
         )
 
         integrator = LangevinIntegrator(

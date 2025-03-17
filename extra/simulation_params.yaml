@@ -19,7 +19,7 @@ sim_steps: 10000
 # Integrator
 temperature: 300 # kelvin
 friction_coeff: 1.0 # picoseconds
-timestep: 2.0 # femtoseconds
+timestep: 4.0 # femtoseconds
 
 # Reporters
 report_interval: 100
