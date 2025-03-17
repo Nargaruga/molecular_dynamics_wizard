@@ -79,7 +79,7 @@ class AllAtomSimulationHandler(SimulationHandler):
         system = forcefield.createSystem(
             pdb.topology,
             nonbondedMethod=CutoffNonPeriodic,
-            nonbondedCutoff=1.0 * nanometer,
+            nonbondedCutoff=2.0 * nanometer,
             constraints=HBonds,
             hydrogenMass=1.5 * amu,
         )
