@@ -8,7 +8,8 @@
 *.zip
 
 inputs/
-tmp
+tmp/
+results/
 */test
 *old
 martini_parameters
