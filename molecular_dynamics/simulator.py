@@ -31,7 +31,7 @@ def setup_tmp_dir(pdb_path, params, extra=""):
 def main():
     if len(sys.argv) < 3:
         print(
-            "Usage: python simulator.py <pdb_path> <simulation_params_file> [neighbourhood_depth] [chains_file]"
+            "Usage: python simulator.py <pdb_path> <simulation_params_file> [neighbourhood_depth] [neighbourhood_radius] [chains_file]"
         )
         exit(1)
 
@@ -45,9 +45,10 @@ def main():
 
     try:
         neighbourhood_depth = int(sys.argv[3])
+        neighbourhood_radius = int(sys.argv[4])
 
         try:
-            chains_file = sys.argv[4]
+            chains_file = sys.argv[5]
         except IndexError:
             print("Missing heavy and light chain information.")
             return
@@ -60,7 +61,11 @@ def main():
         tmp_dir = setup_tmp_dir(pdb_path, params, f"d{neighbourhood_depth}")
         simulation = AllAtomSimulationHandler(tmp_dir, params)
         simulation.simulate_partial(
-            molecule_name, neighbourhood_depth, heavy_chains, light_chains
+            molecule_name,
+            neighbourhood_depth,
+            neighbourhood_radius,
+            heavy_chains,
+            light_chains,
         )
 
     except IndexError:

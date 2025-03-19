@@ -49,7 +49,9 @@ class AllAtomSimulationHandler:
         print("Loaded simulation parameters:")
         parameters.print()
 
-    def shrink_to_interaction_site(self, molecule, depth, heavy_chains, light_chains):
+    def shrink_to_interaction_site(
+        self, molecule, depth, radius, heavy_chains, light_chains
+    ):
         if depth >= 0:
             self.identify_paratope(
                 molecule, f"{molecule}_paratope", heavy_chains, light_chains
@@ -83,6 +85,7 @@ class AllAtomSimulationHandler:
                     [f"chain {chain}" for chain in heavy_chains + light_chains]
                 ),
                 depth,
+                radius,
             )
 
             # Obtain a further extended neighbourhood of the paratope that will have its atoms locked
@@ -102,6 +105,7 @@ class AllAtomSimulationHandler:
                     [f"not chain {chain}" for chain in heavy_chains + light_chains]
                 ),
                 depth,
+                radius,
             )
 
             # Obtain a further extended neighbourhood of the epitope that will have its atoms locked
@@ -183,15 +187,25 @@ class AllAtomSimulationHandler:
             )
         return atoms
 
-    def get_neigbourhood(self, selection_name, target_name, chains, depth=1):
+    def get_neigbourhood(
+        self, selection_name, target_name, chains, depth=1, radius=0
+    ):
         residues = set()
 
-        if depth == 0:
+        if depth == 0 and radius == 0:
             cmd.select(name=selection_name, selection=target_name)
-        else:
+
+        if depth > 0:
             cmd.select(
                 name=selection_name,
                 selection=f"byres {target_name} extend {depth} and ({chains})",
+                merge=1,
+            )
+
+        if radius > 0:
+            cmd.select(
+                name=selection_name,
+                selection=f"byres {target_name} expand {radius} and ({chains})",
                 merge=1,
             )
 
@@ -296,13 +310,13 @@ class AllAtomSimulationHandler:
         print("Running simulation...")
         simulation.step(self.parameters.sim_steps)
 
-    def simulate_partial(self, molecule, depth, heavy_chains, light_chains):
+    def simulate_partial(self, molecule, depth, radius, heavy_chains, light_chains):
         if depth < 0:
             print("Neighbourhood depth must be >= 0.")
             return
 
         final_molecule = self.shrink_to_interaction_site(
-            molecule, depth, heavy_chains, light_chains
+            molecule, depth, radius, heavy_chains, light_chains
         )
         self.simulation_data.final_molecule = final_molecule
         cmd.disable(molecule)

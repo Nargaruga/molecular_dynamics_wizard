@@ -65,9 +65,11 @@ class Dynamics(Wizard):
         self.heavy_chains = []
         self.light_chains = []
         self.sim_depth = 2
+        self.sim_radius = 10
         self.sim_type = SimulationType.ALL_ATOM
         self.populate_molecule_choices()
         self.populate_sim_depth_choices()
+        self.populate_sim_radius_choices()
         self.populate_sim_type_choices()
         self.status = WizardState.READY
 
@@ -98,14 +100,19 @@ class Dynamics(Wizard):
         else:
             molecule_label = self.molecule
 
-        depth_label = f"Neighbourhood: {self.sim_depth}"
+        depth_label = f"Neighbourhood Depth: {self.sim_depth}"
+        radius_label = f"Neighbourhood Radius: {self.sim_radius}"
         sim_type_label = f"Simulation type: {self.sim_type.name}"
 
         options = [[1, "Molecular Dynamics", ""], [3, sim_type_label, "sim_type"]]
 
         if self.status >= WizardState.READY:
             options.extend(
-                [[3, molecule_label, "molecule"], [3, depth_label, "sim_depth"]]
+                [
+                    [3, molecule_label, "molecule"],
+                    [3, depth_label, "sim_depth"],
+                    [3, radius_label, "sim_radius"],
+                ]
             )
 
         heavy_chain_label = "Heavy Chains: "
@@ -193,6 +200,26 @@ class Dynamics(Wizard):
                 ]
             )
 
+    def populate_sim_radius_choices(self):
+        """Populate the menu with the possible values for the radius of the paratope neighbourhood to simulate."""
+
+        self.menu["sim_radius"] = [[2, "Neighbourhood Radius", ""]]
+        radii = [
+            0,
+            5,
+            10,
+            15,
+            20,
+        ]  # Angstrom TODO: generate based on the cutoff distance in the simulation parameters
+        for r in radii:
+            self.menu["sim_radius"].append(
+                [
+                    1,
+                    str(r),
+                    "cmd.get_wizard().set_sim_radius(" + str(r) + ")",
+                ]
+            )
+
     def populate_sim_type_choices(self):
         """Populate the menu with the possible values for the type of simulation to perform."""
 
@@ -246,6 +273,12 @@ class Dynamics(Wizard):
         self.sim_depth = depth
         cmd.refresh_wizard()
 
+    def set_sim_radius(self, radius):
+        """Set the radius of the paratope neighbourhood to simulate."""
+
+        self.sim_radius = radius
+        cmd.refresh_wizard()
+
     def set_sim_type(self, sim_type_str):
         """Set the type of simulation to perform."""
 
@@ -267,11 +300,11 @@ class Dynamics(Wizard):
 
         # Run the simulation on a separate thread to keep the interface responsive
         worker_thread = threading.Thread(
-            target=self.run_simulation, args=[self.sim_depth]
+            target=self.run_simulation,
         )
         worker_thread.start()
 
-    def run_simulation(self, depth=2):
+    def run_simulation(self):
         """Run the simulation."""
 
         if self.molecule is None:
@@ -283,14 +316,18 @@ class Dynamics(Wizard):
         sim_params = load_configuration(get_installed_wizard_path())
         tmp_dir = os.path.join(
             "simulations",
-            f"{self.molecule}_{time.strftime('%Y-%m-%d_%H-%M-%S')}_s{sim_params.sim_steps}_d{depth}",
+            f"{self.molecule}_{time.strftime('%Y-%m-%d_%H-%M-%S')}_s{sim_params.sim_steps}_d{self.sim_depth}r{self.sim_radius}",
         )
         os.makedirs(tmp_dir)
         cmd.save(os.path.join(tmp_dir, f"{self.molecule}.pdb"), self.molecule)
         try:
             simulation = AllAtomSimulationHandler(tmp_dir, sim_params)
             simulation.simulate_partial(
-                self.molecule, depth, self.heavy_chains, self.light_chains
+                self.molecule,
+                self.sim_depth,
+                self.sim_radius,
+                self.heavy_chains,
+                self.light_chains,
             )
         except Exception as e:
             cmd.set_wizard()
