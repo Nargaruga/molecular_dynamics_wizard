@@ -138,6 +138,7 @@ def plot_duration(ax: Axes, entries: list[int], depths: list[int]):
 
 
 def process_directory(
+    molecule_name,
     full_sim,
     minimized,
     dir: str,
@@ -168,7 +169,7 @@ def process_directory(
             durations.append(float(final_line.split(",")[3]))
 
         partial = mda.Universe(
-            os.path.join(sim_dir, "ready.pdb"), os.path.join(sim_dir, "trajectory.dcd")
+            os.path.join(sim_dir, f"{molecule_name}_fixed.pdb"), os.path.join(sim_dir, "trajectory.dcd")
         )
 
         rmsd_runs.append(rms.RMSD(partial, full_sim, select=paratope_selection).run())
@@ -178,14 +179,14 @@ def process_directory(
 
         rmsf_h_runs.append(
             compute_rmsf(
-                os.path.join(sim_dir, "ready.pdb"),
+                os.path.join(sim_dir, f"{molecule_name}_fixed.pdb"),
                 os.path.join(sim_dir, "trajectory.dcd"),
                 paratope_hc_selection,
             ),  # heavy chain RMSF
         )
         rmsf_l_runs.append(
             compute_rmsf(
-                os.path.join(sim_dir, "ready.pdb"),
+                os.path.join(sim_dir, f"{molecule_name}_fixed.pdb"),
                 os.path.join(sim_dir, "trajectory.dcd"),
                 paratope_lc_selection,
             ),  # heavy chain RMSF
@@ -198,7 +199,7 @@ def process_directory(
     avg_rmsf_h = average_rmsf(rmsf_h_runs)
     avg_rmsf_l = average_rmsf(rmsf_l_runs)
 
-    cmd.load(os.path.join(sim_dirs[0], "ready.pdb"), f"sim_d{depth}")
+    cmd.load(os.path.join(sim_dirs[0], f"{molecule_name}_fixed.pdb"), f"sim_d{depth}")
     cmd.load(os.path.join(sim_dirs[0], "trajectory.dcd"), f"sim_d{depth}")
 
     return (
@@ -213,7 +214,7 @@ def process_directory(
 
 def compare_sims(molecule_name: str, n_frames_str: str):
     n_frames = int(n_frames_str)
-    base = "/home/leo/anaconda3/envs/md_test/lib/python3.9/site-packages/pymol/wizard/tmp/sim_comparison"
+    base = "/home/leo/Desktop/remote_simulations/results/compare_sims"
     molecule_dir = os.path.join(base, molecule_name)
 
     avg_durations = []
@@ -225,12 +226,12 @@ def compare_sims(molecule_name: str, n_frames_str: str):
 
     full_sim = minimized = mda.Universe(
         os.path.join(molecule_dir, "minimized.pdb"),
-        os.path.join(molecule_dir, "full_trajectory.dcd"),
+        os.path.join(molecule_dir, "trajectory.dcd"),
     )
 
     minimized = mda.Universe(os.path.join(molecule_dir, "minimized.pdb"))
 
-    with open(os.path.join(molecule_dir, "interaction_zone.json")) as f:
+    with open(os.path.join(molecule_dir, "binding_site.json")) as f:
         sim_metadata = json.load(f)
         paratope_residues = sim_metadata["paratope"]
 
@@ -284,6 +285,7 @@ def compare_sims(molecule_name: str, n_frames_str: str):
                 avg_rmsf_h,
                 avg_rmsf_l,
             ) = process_directory(
+                molecule_name,
                 full_sim,
                 minimized,
                 dir,
@@ -311,7 +313,7 @@ def compare_sims(molecule_name: str, n_frames_str: str):
     # compute the rmsf for the paratope on the full simulation
     rmsf_h_full = compute_rmsf(
         os.path.join(molecule_dir, "minimized.pdb"),
-        os.path.join(molecule_dir, "full_trajectory.dcd"),
+        os.path.join(molecule_dir, "trajectory.dcd"),
         paratope_hc_selection,
     )
     if not rmsf_h_full:
@@ -320,7 +322,7 @@ def compare_sims(molecule_name: str, n_frames_str: str):
 
     rmsf_l_full = compute_rmsf(
         os.path.join(molecule_dir, "minimized.pdb"),
-        os.path.join(molecule_dir, "full_trajectory.dcd"),
+        os.path.join(molecule_dir, "trajectory.dcd"),
         paratope_lc_selection,
     )
     if not rmsf_l_full:
@@ -328,14 +330,14 @@ def compare_sims(molecule_name: str, n_frames_str: str):
     avg_rmsf_l_by_depth.append(average_rmsf([rmsf_l_full]))
 
     # get the time needed for the full simulation
-    with open(os.path.join(molecule_dir, "full_sim_state.csv")) as f:
+    with open(os.path.join(molecule_dir, "sim_state.csv")) as f:
         final_line = f.readlines()[-1].strip()
         avg_durations.append(float(final_line.split(",")[3]))
 
     str_depths.append("Whole molecule")
 
     cmd.load(os.path.join(molecule_dir, "minimized.pdb"), "full_sim")
-    cmd.load(os.path.join(molecule_dir, "full_trajectory.dcd"), "full_sim")
+    cmd.load(os.path.join(molecule_dir, "trajectory.dcd"), "full_sim")
 
     _, (rmsd_ax, rmsd_static_ax) = plt.subplots(2, 1)
     rmsd_ax.set_title("Partial VS full simulation")

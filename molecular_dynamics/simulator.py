@@ -58,7 +58,7 @@ def main():
             heavy_chains = data["heavy_chains"]
             light_chains = data["light_chains"]
 
-        tmp_dir = setup_tmp_dir(pdb_path, params, f"d{neighbourhood_depth}")
+        tmp_dir = setup_tmp_dir(pdb_path, params, f"d{neighbourhood_depth}r{neighbourhood_radius}")
         simulation = AllAtomSimulationHandler(tmp_dir, params)
         simulation.simulate_partial(
             molecule_name,
