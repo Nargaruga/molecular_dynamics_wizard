@@ -32,8 +32,10 @@ def get_configuration_path():
     with open(install_data_path) as f:
         data = json.load(f)
         try:
-            config_path = data["config_path"]
-            return os.path.join(config_path, "simulation_params.yaml")
+            installed_wizard_dir = data["installed_wizard_dir"]
+            return os.path.join(
+                installed_wizard_dir, "dynamics_extra", "simulation_params.yaml"
+            )
         except KeyError:
             print(
                 f"WARNING: Failed to read configuration file path from {install_data_path}."
