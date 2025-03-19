@@ -1,17 +1,28 @@
+import sys
 import os
 import json
 
 from openmm.app.pdbfile import PDBFile
 from openmm.app import Simulation
-from openmm.openmm import LangevinIntegrator, MonteCarloBarostat
-from openmm.app import ForceField, CutoffNonPeriodic, HBonds
-from openmm.unit import kelvin, picosecond, femtosecond, nanometer, bar, amu
+from openmm.openmm import (
+    LangevinIntegrator,
+    MonteCarloBarostat,
+    CustomExternalForce,
+)
+from openmm.app import ForceField, CutoffNonPeriodic, StateDataReporter, DCDReporter
+from openmm.unit import (
+    kelvin,
+    picosecond,
+    femtosecond,
+    nanometer,
+    bar,
+    kilojoules_per_mole,
+)
 
 import pdbfixer
 
 from pymol import cmd
 
-from .simulation_handler import SimulationHandler
 from .simulation_params import SimulationParameters
 
 
@@ -29,7 +40,7 @@ class SimulationData:
         self.locked_epitope_neigh_residues = set()
 
 
-class AllAtomSimulationHandler(SimulationHandler):
+class AllAtomSimulationHandler:
     def __init__(self, tmp_dir, parameters: SimulationParameters):
         self.tmp_dir = tmp_dir
         self.parameters = parameters
@@ -38,9 +49,7 @@ class AllAtomSimulationHandler(SimulationHandler):
         print("Loaded simulation parameters:")
         parameters.print()
 
-    def preprocess_input(self, molecule, depth, heavy_chains, light_chains):
-        """Prepare the input files for the simulation."""
-
+    def shrink_to_interaction_site(self, molecule, depth, heavy_chains, light_chains):
         if depth >= 0:
             self.identify_paratope(
                 molecule, f"{molecule}_paratope", heavy_chains, light_chains
@@ -292,7 +301,7 @@ class AllAtomSimulationHandler(SimulationHandler):
             print("Neighbourhood depth must be >= 0.")
             return
 
-        final_molecule = self.preprocess_input(
+        final_molecule = self.shrink_to_interaction_site(
             molecule, depth, heavy_chains, light_chains
         )
         self.simulation_data.final_molecule = final_molecule
@@ -409,5 +418,44 @@ class AllAtomSimulationHandler(SimulationHandler):
         print("Running simulation...")
         simulation.step(self.parameters.sim_steps)
 
-    def postprocess_output(self):
-        pass
+    def snapshot(self, simulation, file_name):
+        """Save a snapshot of the simulation."""
+
+        state = simulation.context.getState(getPositions=True)
+        with open(os.path.join(self.tmp_dir, file_name), "w") as output:
+            PDBFile.writeFile(
+                simulation.topology, state.getPositions(), output, keepIds=True
+            )
+
+    def enable_reporters(self, simulation):
+        """Enable the reporters for the simulation."""
+
+        simulation.reporters.append(
+            DCDReporter(
+                os.path.join(self.tmp_dir, "trajectory.dcd"),
+                self.parameters.report_interval,
+            )
+        )
+
+        simulation.reporters.append(
+            StateDataReporter(
+                os.path.join(self.tmp_dir, "sim_state.csv"),
+                self.parameters.report_interval,
+                step=True,
+                elapsedTime=True,
+                potentialEnergy=True,
+                temperature=True,
+            )
+        )
+
+        simulation.reporters.append(
+            StateDataReporter(
+                sys.stdout,
+                self.parameters.report_interval,
+                step=True,
+                totalSteps=self.parameters.sim_steps,
+                elapsedTime=True,
+                progress=True,
+                remainingTime=True,
+            )
+        )

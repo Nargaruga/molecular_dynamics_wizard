@@ -289,7 +289,7 @@ class Dynamics(Wizard):
         cmd.save(os.path.join(tmp_dir, f"{self.molecule}.pdb"), self.molecule)
         try:
             simulation = AllAtomSimulationHandler(tmp_dir, sim_params)
-            simulation.simulate(
+            simulation.simulate_partial(
                 self.molecule, depth, self.heavy_chains, self.light_chains
             )
         except Exception as e:
