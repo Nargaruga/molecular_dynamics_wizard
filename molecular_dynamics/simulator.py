@@ -44,7 +44,7 @@ def main():
     params.parse_file(simulation_params_file)
 
     try:
-        neighbourhood_depth = sys.argv[3]
+        neighbourhood_depth = int(sys.argv[3])
 
         try:
             chains_file = sys.argv[4]
@@ -57,7 +57,7 @@ def main():
             heavy_chains = data["heavy_chains"]
             light_chains = data["light_chains"]
 
-        tmp_dir = setup_tmp_dir(params, f"d{neighbourhood_depth}")
+        tmp_dir = setup_tmp_dir(pdb_path, params, f"d{neighbourhood_depth}")
         simulation = AllAtomSimulationHandler(tmp_dir, params)
         simulation.simulate_partial(
             molecule_name, neighbourhood_depth, heavy_chains, light_chains
