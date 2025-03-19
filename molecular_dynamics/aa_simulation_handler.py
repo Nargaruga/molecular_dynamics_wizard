@@ -384,12 +384,19 @@ class AllAtomSimulationHandler:
             ),
         )
 
+        restraint = CustomExternalForce("k*((x-x0)^2+(y-y0)^2+(z-z0)^2)")
+        system.addForce(restraint)
+        restraint.addGlobalParameter("k", 1000.0 * kilojoules_per_mole / nanometer)
+        restraint.addPerParticleParameter("x0")
+        restraint.addPerParticleParameter("y0")
+        restraint.addPerParticleParameter("z0")
+
         for atom in pdb.topology.atoms():
             if (
                 atom.index not in atoms_to_simulate
                 and atom.index not in self.simulation_data.constrained_atoms
             ):
-                system.setParticleMass(atom.index, 0)
+                restraint.addParticle(atom.index, pdb.positions[atom.index])
 
         simulation = Simulation(pdb.topology, system, integrator)
         self.enable_reporters(simulation)
