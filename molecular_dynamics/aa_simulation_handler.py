@@ -80,8 +80,6 @@ class AllAtomSimulationHandler(SimulationHandler):
             pdb.topology,
             nonbondedMethod=CutoffNonPeriodic,
             nonbondedCutoff=2.0 * nanometer,
-            constraints=HBonds,
-            hydrogenMass=1.5 * amu,
         )
 
         integrator = LangevinIntegrator(
