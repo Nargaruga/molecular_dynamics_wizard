@@ -59,14 +59,14 @@ def main():
 
         tmp_dir = setup_tmp_dir(params, f"d{neighbourhood_depth}")
         simulation = AllAtomSimulationHandler(tmp_dir, params)
-        simulation.simulate(
+        simulation.simulate_partial(
             molecule_name, neighbourhood_depth, heavy_chains, light_chains
         )
 
     except IndexError:
         tmp_dir = setup_tmp_dir(pdb_path, params, "full")
         simulation = AllAtomSimulationHandler(tmp_dir, params)
-        simulation.simulate_full(molecule_name)
+        simulation.simulate(molecule_name)
 
     print(f"Done! Simulation files saved at {tmp_dir}")
 

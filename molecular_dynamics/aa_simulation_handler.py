@@ -234,7 +234,7 @@ class AllAtomSimulationHandler(SimulationHandler):
         cmd.create(f"{molecule}_sliced", selection)
         cmd.delete(selection)
 
-    def simulate_full(self, molecule):
+    def simulate(self, molecule):
         final_molecule = f"{molecule}_fixed"
         self.fix_pdb(molecule, final_molecule)
 
@@ -287,7 +287,7 @@ class AllAtomSimulationHandler(SimulationHandler):
         print("Running simulation...")
         simulation.step(self.parameters.sim_steps)
 
-    def simulate(self, molecule, depth, heavy_chains, light_chains):
+    def simulate_partial(self, molecule, depth, heavy_chains, light_chains):
         if depth < 0:
             print("Neighbourhood depth must be >= 0.")
             return

@@ -2,7 +2,6 @@ import os
 import sys
 import subprocess
 import shutil
-import json
 
 
 def main():
@@ -41,6 +40,23 @@ def main():
     except subprocess.CalledProcessError as e:
         print(f"Something went wrong while installing the paratope heatmap wizard: {e}")
         exit(1)
+
+    shutil.copy(
+        os.path.join(wizard_root, "installation_data.json"),
+        os.path.join(wizard_root, "dynamics_settings_plugin", "installation_data.json"),
+    )
+
+    subprocess.run(
+        [
+            "zip",
+            "-r",
+            "plugin.zip",
+            "dynamics_settings_plugin",
+
+        ],
+        cwd=wizard_root,
+        check=True,
+    )
 
 
 if __name__ == "__main__":
