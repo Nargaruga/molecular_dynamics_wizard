@@ -226,13 +226,14 @@ class AllAtomSimulationHandler:
             print("Removing non-simulated atoms...")
             # This operation causes the renumbering of all atoms,
             # but the residue ids are preserved
+            residues_to_keep = residues_to_simulate.union(
+                get_residues(binding_site.ext_paratope_neigh_sel)
+            ).union(get_residues(binding_site.ext_epitope_neigh_sel))
 
             sliced_molecule = f"{molecule}_sliced"
             self.slice_object(
                 molecule,
-                residues_to_simulate.union(
-                    get_residues(binding_site.ext_paratope_neigh_sel)
-                ).union(get_residues(binding_site.ext_epitope_neigh_sel)),
+                residues_to_keep,
                 sliced_molecule,
             )
 
@@ -248,6 +249,11 @@ class AllAtomSimulationHandler:
         self.fix_pdb(to_fix, fixed_molecule)
         cmd.load(os.path.join(self.tmp_dir, f"{fixed_molecule}.pdb"), fixed_molecule)
         cmd.disable(fixed_molecule)
+
+        atoms_to_simulate = residues_to_atoms(
+            fixed_molecule,
+            residues_to_simulate,
+        )
 
         # Save residue ids to json TODO
         # with open(os.path.join(self.tmp_dir, "simulated_residues.json"), "w") as f:
@@ -272,8 +278,19 @@ class AllAtomSimulationHandler:
         #         f,
         #     )
 
+        cmd.set("pdb_conect_all", 1)
         minimized_molecule = f"{fixed_molecule}_minimized"
-        self.minimize(fixed_molecule, minimized_molecule)
+        self.minimize(
+            fixed_molecule,
+            minimized_molecule,
+            residues_to_atoms(
+                fixed_molecule,
+                get_residues(binding_site.ext_paratope_neigh_sel).union(
+                    get_residues(binding_site.ext_epitope_neigh_sel)
+                ),
+            ),
+        )
+        cmd.set("pdb_conect_all", 0)
 
         pdb, system, integrator = self.create_system(minimized_molecule)
 
@@ -282,37 +299,29 @@ class AllAtomSimulationHandler:
             self.simulation_data.constrained_atoms.add(particle1)
             self.simulation_data.constrained_atoms.add(particle2)
 
-        simulation = Simulation(pdb.topology, system, integrator)
-        self.enable_reporters(simulation)
-        simulation.context.setPositions(pdb.positions)
-
-        print("Minimizing energy...")
-        simulation.minimizeEnergy(maxIterations=self.parameters.minimization_steps)
-        minimized_molecule = f"{fixed_molecule}_minimized"
-        self.snapshot(simulation, f"{minimized_molecule}.pdb")
-
-        atoms_to_simulate = residues_to_atoms(
-            minimized_molecule,
-            residues_to_simulate,
-        )
-
         self.simulation_data.final_molecule = minimized_molecule
         self.simulation_data.binding_site = binding_site
 
-        # restraint = CustomExternalForce("k*((x-x0)^2+(y-y0)^2+(z-z0)^2)")
-        # system.addForce(restraint)
-        # restraint.addGlobalParameter("k", 1000.0 * kilojoules_per_mole / nanometer)
-        # restraint.addPerParticleParameter("x0")
-        # restraint.addPerParticleParameter("y0")
-        # restraint.addPerParticleParameter("z0")
+        restraint = CustomExternalForce("k*((x-x0)^2+(y-y0)^2+(z-z0)^2)")
+        system.addForce(restraint)
+        restraint.addGlobalParameter("k", 1000.0 * kilojoules_per_mole / nanometer)
+        restraint.addPerParticleParameter("x0")
+        restraint.addPerParticleParameter("y0")
+        restraint.addPerParticleParameter("z0")
 
         for atom in pdb.topology.atoms():
             if (
                 atom.index not in atoms_to_simulate
                 and atom.index not in self.simulation_data.constrained_atoms
             ):
-                # restraint.addParticle(atom.index, pdb.positions[atom.index])
-                system.setParticleMass(atom.index, 0.0)
+                if self.parameters.remove_non_simulated:
+                    restraint.addParticle(atom.index, pdb.positions[atom.index])
+                else:
+                    system.setParticleMass(atom.index, 0.0)
+
+        simulation = Simulation(pdb.topology, system, integrator)
+        self.enable_reporters(simulation)
+        simulation.context.setPositions(pdb.positions)
 
         if self.parameters.nvt_steps > 0:
             print("NVT Equilibration...")

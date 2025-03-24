@@ -543,7 +543,9 @@ class Dynamics(Wizard):
 
         output_name = simulation.simulation_data.final_molecule
         cmd.disable(self.molecule)
+        cmd.set("connect_mode", 1)
         cmd.load(os.path.join(tmp_dir, f"{output_name}.pdb"), output_name)
+        cmd.set("connect_mode", 0)
         cmd.load_traj(os.path.join(tmp_dir, "trajectory.dcd"), output_name)
 
         # Colour the residues
