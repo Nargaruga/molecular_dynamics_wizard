@@ -169,7 +169,7 @@ def process_directory(
             durations.append(float(final_line.split(",")[3]))
 
         partial = mda.Universe(
-            os.path.join(sim_dir, f"{molecule_name}_fixed.pdb"), os.path.join(sim_dir, "trajectory.dcd")
+            os.path.join(sim_dir, f"{molecule_name}_minimized.pdb"), os.path.join(sim_dir, "trajectory.dcd")
         )
 
         rmsd_runs.append(rms.RMSD(partial, full_sim, select=paratope_selection).run())
@@ -179,14 +179,14 @@ def process_directory(
 
         rmsf_h_runs.append(
             compute_rmsf(
-                os.path.join(sim_dir, f"{molecule_name}_fixed.pdb"),
+                os.path.join(sim_dir, f"{molecule_name}_minimized.pdb"),
                 os.path.join(sim_dir, "trajectory.dcd"),
                 paratope_hc_selection,
             ),  # heavy chain RMSF
         )
         rmsf_l_runs.append(
             compute_rmsf(
-                os.path.join(sim_dir, f"{molecule_name}_fixed.pdb"),
+                os.path.join(sim_dir, f"{molecule_name}_minimized.pdb"),
                 os.path.join(sim_dir, "trajectory.dcd"),
                 paratope_lc_selection,
             ),  # heavy chain RMSF
@@ -199,7 +199,7 @@ def process_directory(
     avg_rmsf_h = average_rmsf(rmsf_h_runs)
     avg_rmsf_l = average_rmsf(rmsf_l_runs)
 
-    cmd.load(os.path.join(sim_dirs[0], f"{molecule_name}_fixed.pdb"), f"sim_d{depth}")
+    cmd.load(os.path.join(sim_dirs[0], f"{molecule_name}_minimized.pdb"), f"sim_d{depth}")
     cmd.load(os.path.join(sim_dirs[0], "trajectory.dcd"), f"sim_d{depth}")
 
     return (
@@ -212,7 +212,7 @@ def process_directory(
     )
 
 
-def compare_sims(molecule_name: str, n_frames_str: str):
+def compare_sims(molecule_name: str, subdir: str, n_frames_str: str):
     n_frames = int(n_frames_str)
     base = "/home/leo/Desktop/remote_simulations/results/compare_sims"
     molecule_dir = os.path.join(base, molecule_name)
@@ -268,7 +268,7 @@ def compare_sims(molecule_name: str, n_frames_str: str):
 
     # compute the rmsd and simulation duration for the various partial simulations
     dirs = [
-        f.path for f in os.scandir(molecule_dir) if f.is_dir() and f.name != "ignore"
+        f.path for f in os.scandir(os.path.join(molecule_dir, subdir)) if f.is_dir() and f.name != "ignore"
     ]
     if not dirs:
         print("No simulation directories found")
