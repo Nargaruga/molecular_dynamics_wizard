@@ -24,20 +24,14 @@ import pdbfixer
 from pymol import cmd
 
 from .simulation_params import SimulationParameters
+from .binding_site import BindingSite, get_residues, residues_to_atoms
 
 
 class SimulationData:
     def __init__(self):
         self.final_molecule = ""
         self.constrained_atoms = set()
-
-        self.paratope_residues = set()
-        self.paratope_neigh_residues = set()
-        self.locked_paratope_neigh_residues = set()
-
-        self.epitope_residues = set()
-        self.epitope_neigh_residues = set()
-        self.locked_epitope_neigh_residues = set()
+        self.binding_site = None
 
 
 class AllAtomSimulationHandler:
@@ -49,112 +43,42 @@ class AllAtomSimulationHandler:
         print("Loaded simulation parameters:")
         parameters.print()
 
-    def shrink_to_interaction_site(
-        self, molecule, depth, radius, heavy_chains, light_chains
-    ):
-        if depth >= 0:
-            self.identify_paratope(
-                molecule, f"{molecule}_paratope", heavy_chains, light_chains
-            )
+    # def shrink_to_binding_site(self, molecule, binding_site: BindingSite):
+    #     # Create a new object out of the non-simulated atoms
+    #     non_sim_molecule = f"{molecule}_non_sim"
+    #     non_sim_molecule_sel = f"{non_sim_molecule}_sel"
+    #     # This object includes the locked neighbourhood, which will help us
+    #     # align the final trajaectory with the original structure
+    #     cmd.select(
+    #         name=non_sim_molecule_sel,
+    #         selection=f"byres {molecule} and not {binding_site.paratope_neigh_sel} and not {binding_site.epitope_neigh_sel}",
+    #     )
+    #     cmd.create(non_sim_molecule, non_sim_molecule_sel)
+    #     cmd.delete(non_sim_molecule_sel)
+    #     cmd.align(non_sim_molecule, molecule)
+    #     cmd.disable(non_sim_molecule)
 
-            self.select_epitope(
-                molecule,
-                f"{molecule}_paratope",
-                f"{molecule}_epitope",
-                heavy_chains,
-                light_chains,
-            )
+    #     if self.parameters.remove_non_simulated:
+    #         print("Removing non-simulated atoms...")
+    #         # This operation causes the renumbering of all atoms,
+    #         # but the residue ids are preserved
 
-            cmd.iterate(
-                f"{molecule}_paratope",
-                "self.simulation_data.paratope_residues.add((resi, chain))",
-                space=locals(),
-            )
+    #         self.slice_object(
+    #             molecule,
+    #             get_residues(binding_site.paratope_sel)
+    #             .union(get_residues(binding_site.epitope_sel))
+    #             .union(get_residues(binding_site.paratope_neigh_sel))
+    #             .union(get_residues(binding_site.epitope_neigh_sel)),
+    #         )
 
-            cmd.iterate(
-                f"{molecule}_epitope",
-                "self.simulation_data.epitope_residues.add((resi, chain))",
-                space=locals(),
-            )
+    #         to_save = f"{molecule}_sliced"
+    #     else:
+    #         to_save = molecule
 
-            # Get the neighbourhood of the paratope
-            self.simulation_data.paratope_neigh_residues = self.get_neigbourhood(
-                f"{molecule}_paratope_neigh",
-                f"{molecule}_paratope",
-                " or ".join(
-                    [f"chain {chain}" for chain in heavy_chains + light_chains]
-                ),
-                depth,
-                radius,
-            )
+    #     cmd.save(os.path.join(self.tmp_dir, f"{to_save}.pdb"), to_save)
+    #     cmd.disable(to_save)
 
-            # Obtain a further extended neighbourhood of the paratope that will have its atoms locked
-            self.simulation_data.locked_paratope_neigh_residues = self.get_neigbourhood(
-                f"{molecule}_locked_paratope_neigh",
-                f"{molecule}_paratope_neigh",
-                " or ".join(
-                    [f"chain {chain}" for chain in heavy_chains + light_chains]
-                ),
-            )
-
-            # Get the neighbourhood of the epitope
-            self.simulation_data.epitope_neigh_residues = self.get_neigbourhood(
-                f"{molecule}_epitope_neigh",
-                f"{molecule}_epitope",
-                " and ".join(
-                    [f"not chain {chain}" for chain in heavy_chains + light_chains]
-                ),
-                depth,
-                radius,
-            )
-
-            # Obtain a further extended neighbourhood of the epitope that will have its atoms locked
-            self.simulation_data.locked_epitope_neigh_residues = self.get_neigbourhood(
-                f"{molecule}_locked_epitope_neigh",
-                f"{molecule}_epitope_neigh",
-                " and ".join(
-                    [f"not chain {chain}" for chain in heavy_chains + light_chains]
-                ),
-            )
-
-            # Create a new object out of the non-simulated atoms
-            non_sim_molecule = f"{molecule}_non_sim"
-            non_sim_molecule_sel = f"{non_sim_molecule}_sel"
-            # This object includes the locked neighbourhood, which will help us
-            # align the final trajaectory with the original structure
-            cmd.select(
-                name=non_sim_molecule_sel,
-                selection=f"byres {molecule} and not {molecule}_paratope_neigh and not {molecule}_epitope_neigh",
-            )
-            cmd.create(non_sim_molecule, non_sim_molecule_sel)
-            cmd.delete(non_sim_molecule_sel)
-            cmd.align(non_sim_molecule, molecule)
-            cmd.disable(non_sim_molecule)
-
-            if self.parameters.remove_non_simulated:
-                print("Removing non-simulated atoms...")
-                # This operation causes the renumbering of all atoms,
-                # but the residue ids are preserved
-                self.slice_object(
-                    molecule,
-                    self.simulation_data.locked_paratope_neigh_residues.union(
-                        self.simulation_data.locked_epitope_neigh_residues
-                    ),
-                )
-
-                to_fix = f"{molecule}_sliced"
-            else:
-                to_fix = molecule
-        else:
-            to_fix = molecule
-
-        cmd.save(os.path.join(self.tmp_dir, f"{to_fix}.pdb"), to_fix)
-        cmd.disable(to_fix)
-
-        final_molecule = f"{molecule}_fixed"
-        self.fix_pdb(to_fix, final_molecule)
-
-        return final_molecule
+    #     return to_save
 
     def fix_pdb(self, input_name, output_name):
         fixer = pdbfixer.PDBFixer(
@@ -176,46 +100,6 @@ class AllAtomSimulationHandler:
             open(os.path.join(self.tmp_dir, f"{output_name}.pdb"), "w"),
             keepIds=True,
         )
-
-    def residues_to_atoms(self, molecule: str, residues: set) -> set:
-        atoms = set()
-        for residue in residues:
-            cmd.iterate(
-                f"{molecule} and resi {residue[0]} and chain {residue[1]}",
-                "atoms.add(index)",
-                space=locals(),
-            )
-        return atoms
-
-    def get_neigbourhood(
-        self, selection_name, target_name, chains, depth=1, radius=0
-    ):
-        residues = set()
-
-        if depth == 0 and radius == 0:
-            cmd.select(name=selection_name, selection=target_name)
-
-        if depth > 0:
-            cmd.select(
-                name=selection_name,
-                selection=f"byres {target_name} extend {depth} and ({chains})",
-                merge=1,
-            )
-
-        if radius > 0:
-            cmd.select(
-                name=selection_name,
-                selection=f"byres {target_name} expand {radius} and ({chains})",
-                merge=1,
-            )
-
-        cmd.iterate(
-            selection_name,
-            "residues.add((resi, chain))",
-            space=locals(),
-        )
-
-        return residues
 
     def identify_paratope(self, molecule, selection_name, heavy_chains, light_chains):
         """Identify the paratope on the selected antibody through the appropriate wizard."""
@@ -244,7 +128,7 @@ class AllAtomSimulationHandler:
             + f") near_to 6.0 of {paratope_sel}",
         )
 
-    def slice_object(self, molecule: str, residues_to_keep: set):
+    def slice_object(self, molecule: str, residues_to_keep: set, output_name: str):
         selection = ""
         for resi, chain in residues_to_keep:
             selection = "selection_to_keep"
@@ -254,14 +138,11 @@ class AllAtomSimulationHandler:
                 merge=1,
             )
 
-        cmd.create(f"{molecule}_sliced", selection)
+        cmd.create(output_name, selection)
         cmd.delete(selection)
 
-    def simulate(self, molecule):
-        final_molecule = f"{molecule}_fixed"
-        self.fix_pdb(molecule, final_molecule)
-
-        pdb = PDBFile(os.path.join(self.tmp_dir, f"{final_molecule}.pdb"))
+    def create_system(self, molecule):
+        pdb = PDBFile(os.path.join(self.tmp_dir, f"{molecule}.pdb"))
         forcefield = ForceField(
             self.parameters.force_field, self.parameters.water_model
         )
@@ -278,18 +159,41 @@ class AllAtomSimulationHandler:
             self.parameters.timestep * femtosecond,
         )
 
-        for i in range(system.getNumConstraints()):
-            particle1, particle2, _ = system.getConstraintParameters(i)
-            self.simulation_data.constrained_atoms.add(particle1)
-            self.simulation_data.constrained_atoms.add(particle2)
+        return pdb, system, integrator
 
+    def minimize(self, molecule, output_name, atoms_to_lock=None):
+        pdb, system, integrator = self.create_system(molecule)
+
+        if atoms_to_lock is not None:
+            constrained_atoms = set()
+            for i in range(system.getNumConstraints()):
+                particle1, particle2, _ = system.getConstraintParameters(i)
+                constrained_atoms.add(particle1)
+                constrained_atoms.add(particle2)
+
+            for atom in pdb.topology.atoms():
+                if atom.index in atoms_to_lock and atom.index not in constrained_atoms:
+                    system.setParticleMass(atom.index, 0.0)
+
+        simulation = Simulation(pdb.topology, system, integrator)
+        simulation.context.setPositions(pdb.positions)
+        simulation.minimizeEnergy(maxIterations=self.parameters.minimization_steps)
+
+        self.snapshot(simulation, f"{output_name}.pdb")
+
+    def simulate(self, molecule):
+        print("Fixing PDB...")
+        final_molecule = f"{molecule}_fixed"
+        self.fix_pdb(molecule, final_molecule)
+        self.simulation_data.final_molecule = final_molecule
+
+        pdb, system, integrator = self.create_system(final_molecule)
         simulation = Simulation(pdb.topology, system, integrator)
         self.enable_reporters(simulation)
         simulation.context.setPositions(pdb.positions)
 
         print("Minimizing energy...")
         simulation.minimizeEnergy(maxIterations=self.parameters.minimization_steps)
-
         self.snapshot(simulation, f"{molecule}_minimized.pdb")
 
         if self.parameters.nvt_steps > 0:
@@ -310,107 +214,73 @@ class AllAtomSimulationHandler:
         print("Running simulation...")
         simulation.step(self.parameters.sim_steps)
 
-    def simulate_partial(self, molecule, depth, radius, heavy_chains, light_chains):
-        if depth < 0:
-            print("Neighbourhood depth must be >= 0.")
-            return
-
-        final_molecule = self.shrink_to_interaction_site(
-            molecule, depth, radius, heavy_chains, light_chains
-        )
-        self.simulation_data.final_molecule = final_molecule
-        cmd.disable(molecule)
-        cmd.load(os.path.join(self.tmp_dir, f"{final_molecule}.pdb"))
-        cmd.show_as("licorice", final_molecule)
-
-        # Remove overlap
-        self.simulation_data.locked_paratope_neigh_residues = (
-            self.simulation_data.locked_paratope_neigh_residues
-            - self.simulation_data.paratope_neigh_residues
-        )
-        self.simulation_data.paratope_neigh_residues = (
-            self.simulation_data.paratope_neigh_residues
-            - self.simulation_data.paratope_residues
+    def simulate_partial(self, molecule, binding_site: BindingSite):
+        residues_to_simulate = (
+            get_residues(binding_site.paratope_sel)
+            .union(get_residues(binding_site.paratope_neigh_sel))
+            .union(get_residues(binding_site.epitope_sel))
+            .union(get_residues(binding_site.epitope_neigh_sel))
         )
 
-        self.simulation_data.locked_epitope_neigh_residues = (
-            self.simulation_data.locked_epitope_neigh_residues
-            - self.simulation_data.epitope_neigh_residues
-        )
-        self.simulation_data.epitope_neigh_residues = (
-            self.simulation_data.epitope_neigh_residues
-            - self.simulation_data.epitope_residues
-        )
+        if self.parameters.remove_non_simulated:
+            print("Removing non-simulated atoms...")
+            # This operation causes the renumbering of all atoms,
+            # but the residue ids are preserved
 
-        # Save residue ids to json
-        with open(os.path.join(self.tmp_dir, "simulated_residues.json"), "w") as f:
-            json.dump(
-                {
-                    "paratope": list(self.simulation_data.paratope_residues),
-                    "paratope_neighbourhood": list(
-                        self.simulation_data.paratope_neigh_residues
-                    ),
-                    "locked_paratope_neighbourhood": list(
-                        self.simulation_data.locked_paratope_neigh_residues
-                    ),
-                    "epitope": list(self.simulation_data.epitope_residues),
-                    "epitope_neighbourhood": list(
-                        self.simulation_data.epitope_neigh_residues
-                    ),
-                    "locked_epitope_neighbourhood": list(
-                        self.simulation_data.locked_epitope_neigh_residues
-                    ),
-                    "depth": depth,
-                },
-                f,
+            sliced_molecule = f"{molecule}_sliced"
+            self.slice_object(
+                molecule,
+                residues_to_simulate.union(
+                    get_residues(binding_site.ext_paratope_neigh_sel)
+                ).union(get_residues(binding_site.ext_epitope_neigh_sel)),
+                sliced_molecule,
             )
 
-        pdb = PDBFile(os.path.join(self.tmp_dir, f"{final_molecule}.pdb"))
-        forcefield = ForceField(
-            self.parameters.force_field, self.parameters.water_model
-        )
+            to_fix = sliced_molecule
+        else:
+            to_fix = molecule
 
-        system = forcefield.createSystem(
-            pdb.topology,
-            nonbondedMethod=CutoffNonPeriodic,
-            nonbondedCutoff=2.0 * nanometer,
-        )
+        cmd.save(os.path.join(self.tmp_dir, f"{to_fix}.pdb"), to_fix)
+        cmd.disable(to_fix)
 
-        integrator = LangevinIntegrator(
-            self.parameters.temperature * kelvin,
-            self.parameters.friction_coeff / picosecond,
-            self.parameters.timestep * femtosecond,
-        )
+        print("Fixing PDB...")
+        fixed_molecule = f"{to_fix}_fixed"
+        self.fix_pdb(to_fix, fixed_molecule)
+        cmd.load(os.path.join(self.tmp_dir, f"{fixed_molecule}.pdb"), fixed_molecule)
+        cmd.disable(fixed_molecule)
+
+        # Save residue ids to json TODO
+        # with open(os.path.join(self.tmp_dir, "simulated_residues.json"), "w") as f:
+        #     json.dump(
+        #         {
+        #             "paratope": list(self.simulation_data.paratope_residues),
+        #             "paratope_neighbourhood": list(
+        #                 self.simulation_data.paratope_neigh_residues
+        #             ),
+        #             "locked_paratope_neighbourhood": list(
+        #                 self.simulation_data.locked_paratope_neigh_residues
+        #             ),
+        #             "epitope": list(self.simulation_data.epitope_residues),
+        #             "epitope_neighbourhood": list(
+        #                 self.simulation_data.epitope_neigh_residues
+        #             ),
+        #             "locked_epitope_neighbourhood": list(
+        #                 self.simulation_data.locked_epitope_neigh_residues
+        #             ),
+        #             "depth": depth,
+        #         },
+        #         f,
+        #     )
+
+        minimized_molecule = f"{fixed_molecule}_minimized"
+        self.minimize(fixed_molecule, minimized_molecule)
+
+        pdb, system, integrator = self.create_system(minimized_molecule)
 
         for i in range(system.getNumConstraints()):
             particle1, particle2, _ = system.getConstraintParameters(i)
             self.simulation_data.constrained_atoms.add(particle1)
             self.simulation_data.constrained_atoms.add(particle2)
-
-        atoms_to_simulate = self.residues_to_atoms(
-            final_molecule,
-            (
-                self.simulation_data.paratope_residues.union(
-                    self.simulation_data.paratope_neigh_residues
-                )
-                .union(self.simulation_data.epitope_residues)
-                .union(self.simulation_data.epitope_neigh_residues)
-            ),
-        )
-
-        restraint = CustomExternalForce("k*((x-x0)^2+(y-y0)^2+(z-z0)^2)")
-        system.addForce(restraint)
-        restraint.addGlobalParameter("k", 1000.0 * kilojoules_per_mole / nanometer)
-        restraint.addPerParticleParameter("x0")
-        restraint.addPerParticleParameter("y0")
-        restraint.addPerParticleParameter("z0")
-
-        for atom in pdb.topology.atoms():
-            if (
-                atom.index not in atoms_to_simulate
-                and atom.index not in self.simulation_data.constrained_atoms
-            ):
-                restraint.addParticle(atom.index, pdb.positions[atom.index])
 
         simulation = Simulation(pdb.topology, system, integrator)
         self.enable_reporters(simulation)
@@ -418,8 +288,31 @@ class AllAtomSimulationHandler:
 
         print("Minimizing energy...")
         simulation.minimizeEnergy(maxIterations=self.parameters.minimization_steps)
+        minimized_molecule = f"{fixed_molecule}_minimized"
+        self.snapshot(simulation, f"{minimized_molecule}.pdb")
 
-        self.snapshot(simulation, f"{molecule}_minimized.pdb")
+        atoms_to_simulate = residues_to_atoms(
+            minimized_molecule,
+            residues_to_simulate,
+        )
+
+        self.simulation_data.final_molecule = minimized_molecule
+        self.simulation_data.binding_site = binding_site
+
+        # restraint = CustomExternalForce("k*((x-x0)^2+(y-y0)^2+(z-z0)^2)")
+        # system.addForce(restraint)
+        # restraint.addGlobalParameter("k", 1000.0 * kilojoules_per_mole / nanometer)
+        # restraint.addPerParticleParameter("x0")
+        # restraint.addPerParticleParameter("y0")
+        # restraint.addPerParticleParameter("z0")
+
+        for atom in pdb.topology.atoms():
+            if (
+                atom.index not in atoms_to_simulate
+                and atom.index not in self.simulation_data.constrained_atoms
+            ):
+                # restraint.addParticle(atom.index, pdb.positions[atom.index])
+                system.setParticleMass(atom.index, 0.0)
 
         if self.parameters.nvt_steps > 0:
             print("NVT Equilibration...")
