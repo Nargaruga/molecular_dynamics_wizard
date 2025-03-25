@@ -72,8 +72,8 @@ class Dynamics(Wizard):
         self.molecule = None
         self.heavy_chains = []
         self.light_chains = []
-        self.sim_depth = 2
         self.sim_radius = 2
+        self.sim_depth = 2
         self.sim_type = SimulationType.FULL
         self.populate_molecule_choices()
         self.populate_sim_type_choices()
@@ -171,13 +171,13 @@ class Dynamics(Wizard):
                 )
 
             if self.status >= WizardState.SIMULATION_READY:
-                depth_label = f"Neighbourhood Depth: {self.sim_depth}"
                 radius_label = f"Neighbourhood Radius: {self.sim_radius}"
+                depth_label = f"Neighbourhood Depth: {self.sim_depth}"
 
                 options.extend(
                     [
-                        [3, depth_label, "sim_depth"],
                         [3, radius_label, "sim_radius"],
+                        [3, depth_label, "sim_depth"],
                     ]
                 )
 
@@ -232,20 +232,6 @@ class Dynamics(Wizard):
                 ]
             )
 
-    def populate_sim_depth_choices(self):
-        """Populate the menu with the possible values for the depth of the paratope neighbourhood to simulate."""
-
-        self.menu["sim_depth"] = [[2, "Neighbourhood Residues", ""]]
-        depths = [0, 2, 4, 8, 10]
-        for d in depths:
-            self.menu["sim_depth"].append(
-                [
-                    1,
-                    str(d),
-                    "cmd.get_wizard().set_sim_depth(" + str(d) + ")",
-                ]
-            )
-
     def populate_sim_radius_choices(self):
         """Populate the menu with the possible values for the radius of the paratope neighbourhood to simulate."""
 
@@ -263,6 +249,20 @@ class Dynamics(Wizard):
                     1,
                     str(r),
                     "cmd.get_wizard().set_sim_radius(" + str(r) + ")",
+                ]
+            )
+
+    def populate_sim_depth_choices(self):
+        """Populate the menu with the possible values for the depth of the paratope neighbourhood to simulate."""
+
+        self.menu["sim_depth"] = [[2, "Neighbourhood Residues", ""]]
+        depths = [0, 2, 4, 8, 10]
+        for d in depths:
+            self.menu["sim_depth"].append(
+                [
+                    1,
+                    str(d),
+                    "cmd.get_wizard().set_sim_depth(" + str(d) + ")",
                 ]
             )
 
@@ -309,18 +309,18 @@ class Dynamics(Wizard):
         self.update_status()
         cmd.refresh_wizard()
 
-    def set_sim_depth(self, depth):
-        """Set the depth of the paratope neighbourhood to simulate."""
-
-        self.sim_depth = depth
-        self.update_neighbourhoods()
-        self.update_coloring()
-        cmd.refresh_wizard()
-
     def set_sim_radius(self, radius):
         """Set the radius of the paratope neighbourhood to simulate."""
 
         self.sim_radius = radius
+        self.update_neighbourhoods()
+        self.update_coloring()
+        cmd.refresh_wizard()
+
+    def set_sim_depth(self, depth):
+        """Set the depth of the paratope neighbourhood to simulate."""
+
+        self.sim_depth = depth
         self.update_neighbourhoods()
         self.update_coloring()
         cmd.refresh_wizard()
@@ -333,8 +333,8 @@ class Dynamics(Wizard):
             self.status = WizardState.SIMULATION_READY
         elif sim_type_str == "Partial":
             self.sim_type = SimulationType.PARTIAL
-            self.populate_sim_depth_choices()
             self.populate_sim_radius_choices()
+            self.populate_sim_depth_choices()
 
         self.update_status()
         cmd.refresh_wizard()
@@ -366,7 +366,7 @@ class Dynamics(Wizard):
             print("Please perform binding site detection first.")
             return
 
-        self.binding_site.update_neighbourhoods(self.sim_depth, self.sim_radius)
+        self.binding_site.update_neighbourhoods(self.sim_radius, self.sim_depth)
 
     def update_coloring(self):
         """Update the coloring of the molecule based on the selected neighbourhood."""
@@ -396,7 +396,7 @@ class Dynamics(Wizard):
             return
 
         binding_site = BindingSite(self.molecule, self.heavy_chains, self.light_chains)
-        binding_site.select()
+        binding_site.select(self.sim_radius, self.sim_depth)
         self.binding_site = binding_site
 
         self.update_coloring()
@@ -513,7 +513,7 @@ class Dynamics(Wizard):
 
         tmp_dir = os.path.join(
             "simulations",
-            f"{self.molecule}_{time.strftime('%Y-%m-%d_%H-%M-%S')}_s{self.sim_params.sim_steps}_d{self.sim_depth}r{self.sim_radius}",
+            f"{self.molecule}_{time.strftime('%Y-%m-%d_%H-%M-%S')}_s{self.sim_params.sim_steps}_r{self.sim_radius}d{self.sim_depth}",
         )
         os.makedirs(tmp_dir)
         cmd.save(os.path.join(tmp_dir, f"{self.molecule}.pdb"), self.molecule)
