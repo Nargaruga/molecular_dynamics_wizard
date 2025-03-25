@@ -11,6 +11,7 @@ from pymol import cmd
 
 from .simulation_params import SimulationParameters
 from .aa_simulation_handler import AllAtomSimulationHandler
+from .binding_site import BindingSite
 
 
 def lists_to_tuples(lists):
@@ -31,7 +32,7 @@ def setup_tmp_dir(pdb_path, params, extra=""):
 def main():
     if len(sys.argv) < 3:
         print(
-            "Usage: python simulator.py <pdb_path> <simulation_params_file> [neighbourhood_depth] [neighbourhood_radius] [chains_file]"
+            "Usage: python simulator.py <pdb_path> <simulation_params_file> [neighbourhood_radius] [neighbourhood_depth] [chains_file]"
         )
         exit(1)
 
@@ -44,8 +45,8 @@ def main():
     params.parse_file(simulation_params_file)
 
     try:
-        neighbourhood_depth = int(sys.argv[3])
-        neighbourhood_radius = int(sys.argv[4])
+        neighbourhood_radius = int(sys.argv[3])
+        neighbourhood_depth = int(sys.argv[4])
 
         try:
             chains_file = sys.argv[5]
@@ -58,15 +59,13 @@ def main():
             heavy_chains = data["heavy_chains"]
             light_chains = data["light_chains"]
 
-        tmp_dir = setup_tmp_dir(pdb_path, params, f"d{neighbourhood_depth}r{neighbourhood_radius}")
-        simulation = AllAtomSimulationHandler(tmp_dir, params)
-        simulation.simulate_partial(
-            molecule_name,
-            neighbourhood_depth,
-            neighbourhood_radius,
-            heavy_chains,
-            light_chains,
+        tmp_dir = setup_tmp_dir(
+            pdb_path, params, f"r{neighbourhood_radius}d{neighbourhood_depth}"
         )
+        simulation = AllAtomSimulationHandler(tmp_dir, params)
+        binding_site = BindingSite(molecule_name, heavy_chains, light_chains)
+        binding_site.select(neighbourhood_radius, neighbourhood_depth)
+        simulation.simulate_partial(molecule_name, binding_site)
 
     except IndexError:
         tmp_dir = setup_tmp_dir(pdb_path, params, "full")

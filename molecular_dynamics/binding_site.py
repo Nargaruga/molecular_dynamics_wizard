@@ -1,8 +1,7 @@
 from pymol import cmd
 
 
-def select_neighbourhood(new_sel, base_sel, chains, depth=1, radius=0):
-
+def select_neighbourhood(new_sel, base_sel, chains, radius=1, depth=1):
     # Expand the base selection by a given radius
     if radius > 0:
         cmd.select(
@@ -12,7 +11,6 @@ def select_neighbourhood(new_sel, base_sel, chains, depth=1, radius=0):
         )
     else:
         cmd.select(name=new_sel, selection=base_sel)
-
 
     # Extend the newly created selection by a given depth
     if depth > 0:
@@ -63,23 +61,22 @@ class BindingSite:
         self.ext_paratope_neigh_sel = f"{molecule}_ext_paratope_neigh"
         self.ext_epitope_neigh_sel = f"{molecule}_ext_epitope_neigh"
 
-
-    def select(self, depth=1, radius=1):
+    def select(self, radius, depth):
         cmd.delete(self.paratope_sel)
         cmd.delete(self.epitope_sel)
 
         self.select_paratope()
         self.select_epitope()
-        self.update_neighbourhoods(depth, radius)
+        self.update_neighbourhoods(radius, depth)
 
-    def update_neighbourhoods(self, depth=1, radius=1):
+    def update_neighbourhoods(self, radius, depth):
         cmd.delete(self.paratope_neigh_sel)
         cmd.delete(self.epitope_neigh_sel)
         cmd.delete(self.ext_paratope_neigh_sel)
         cmd.delete(self.ext_epitope_neigh_sel)
-    
-        self.select_paratope_neigh(depth, radius)
-        self.select_epitope_neigh(depth, radius)
+
+        self.select_paratope_neigh(radius, depth)
+        self.select_epitope_neigh(radius, depth)
         self.select_paratope_ext_neigh()
         self.select_epitope_ext_neigh()
 
@@ -120,18 +117,22 @@ class BindingSite:
             + f") near_to 6.0 of {self.paratope_sel}",
         )
 
-    def select_paratope_neigh(self, depth=1, radius=1):
+    def select_paratope_neigh(self, radius=1, depth=1):
         select_neighbourhood(
             self.paratope_neigh_sel,
             self.paratope_sel,
             " or ".join(
                 [f"chain {chain}" for chain in self.heavy_chains + self.light_chains]
             ),
-            depth,
             radius,
+            depth,
         )
 
-    def select_epitope_neigh(self, depth=1, radius=1):
+    def select_epitope_neigh(
+        self,
+        radius=1,
+        depth=1,
+    ):
         select_neighbourhood(
             self.epitope_neigh_sel,
             self.epitope_sel,
@@ -141,8 +142,8 @@ class BindingSite:
                     for chain in self.heavy_chains + self.light_chains
                 ]
             ),
-            depth,
             radius,
+            depth,
         )
 
     def select_paratope_ext_neigh(self):
