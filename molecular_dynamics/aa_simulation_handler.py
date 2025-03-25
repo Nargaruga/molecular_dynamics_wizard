@@ -7,7 +7,6 @@ from openmm.app import Simulation
 from openmm.openmm import (
     LangevinIntegrator,
     MonteCarloBarostat,
-    CustomExternalForce,
 )
 from openmm.app import ForceField, CutoffNonPeriodic, StateDataReporter, DCDReporter
 from openmm.unit import (
@@ -16,7 +15,6 @@ from openmm.unit import (
     femtosecond,
     nanometer,
     bar,
-    kilojoules_per_mole,
 )
 
 import pdbfixer
@@ -42,43 +40,6 @@ class AllAtomSimulationHandler:
 
         print("Loaded simulation parameters:")
         parameters.print()
-
-    # def shrink_to_binding_site(self, molecule, binding_site: BindingSite):
-    #     # Create a new object out of the non-simulated atoms
-    #     non_sim_molecule = f"{molecule}_non_sim"
-    #     non_sim_molecule_sel = f"{non_sim_molecule}_sel"
-    #     # This object includes the locked neighbourhood, which will help us
-    #     # align the final trajaectory with the original structure
-    #     cmd.select(
-    #         name=non_sim_molecule_sel,
-    #         selection=f"byres {molecule} and not {binding_site.paratope_neigh_sel} and not {binding_site.epitope_neigh_sel}",
-    #     )
-    #     cmd.create(non_sim_molecule, non_sim_molecule_sel)
-    #     cmd.delete(non_sim_molecule_sel)
-    #     cmd.align(non_sim_molecule, molecule)
-    #     cmd.disable(non_sim_molecule)
-
-    #     if self.parameters.remove_non_simulated:
-    #         print("Removing non-simulated atoms...")
-    #         # This operation causes the renumbering of all atoms,
-    #         # but the residue ids are preserved
-
-    #         self.slice_object(
-    #             molecule,
-    #             get_residues(binding_site.paratope_sel)
-    #             .union(get_residues(binding_site.epitope_sel))
-    #             .union(get_residues(binding_site.paratope_neigh_sel))
-    #             .union(get_residues(binding_site.epitope_neigh_sel)),
-    #         )
-
-    #         to_save = f"{molecule}_sliced"
-    #     else:
-    #         to_save = molecule
-
-    #     cmd.save(os.path.join(self.tmp_dir, f"{to_save}.pdb"), to_save)
-    #     cmd.disable(to_save)
-
-    #     return to_save
 
     def fix_pdb(self, input_name, output_name):
         fixer = pdbfixer.PDBFixer(
@@ -161,19 +122,8 @@ class AllAtomSimulationHandler:
 
         return pdb, system, integrator
 
-    def minimize(self, molecule, output_name, atoms_to_lock=None):
+    def minimize(self, molecule, output_name):
         pdb, system, integrator = self.create_system(molecule)
-
-        if atoms_to_lock is not None:
-            constrained_atoms = set()
-            for i in range(system.getNumConstraints()):
-                particle1, particle2, _ = system.getConstraintParameters(i)
-                constrained_atoms.add(particle1)
-                constrained_atoms.add(particle2)
-
-            for atom in pdb.topology.atoms():
-                if atom.index in atoms_to_lock and atom.index not in constrained_atoms:
-                    system.setParticleMass(atom.index, 0.0)
 
         simulation = Simulation(pdb.topology, system, integrator)
         simulation.context.setPositions(pdb.positions)
@@ -222,6 +172,23 @@ class AllAtomSimulationHandler:
             .union(get_residues(binding_site.epitope_neigh_sel))
         )
 
+        # Create a new object out of the non-simulated atoms
+        non_sim_molecule = f"{molecule}_non_sim"
+        non_sim_molecule_sel = f"{non_sim_molecule}_sel"
+        # This object includes the locked neighbourhood, which will help us
+        # align the final trajaectory with the original structure
+        cmd.select(
+            name=non_sim_molecule_sel,
+            selection=f"byres {molecule}"
+            + f" and not {binding_site.paratope_sel}"
+            + f" and not {binding_site.paratope_neigh_sel}"
+            + f" and not {binding_site.epitope_sel}"
+            + f" and not {binding_site.epitope_neigh_sel}",
+        )
+        cmd.create(non_sim_molecule, non_sim_molecule_sel)
+        cmd.delete(non_sim_molecule_sel)
+        cmd.align(non_sim_molecule, molecule)
+
         if self.parameters.remove_non_simulated:
             print("Removing non-simulated atoms...")
             # This operation causes the renumbering of all atoms,
@@ -255,73 +222,57 @@ class AllAtomSimulationHandler:
             residues_to_simulate,
         )
 
-        # Save residue ids to json TODO
-        # with open(os.path.join(self.tmp_dir, "simulated_residues.json"), "w") as f:
-        #     json.dump(
-        #         {
-        #             "paratope": list(self.simulation_data.paratope_residues),
-        #             "paratope_neighbourhood": list(
-        #                 self.simulation_data.paratope_neigh_residues
-        #             ),
-        #             "locked_paratope_neighbourhood": list(
-        #                 self.simulation_data.locked_paratope_neigh_residues
-        #             ),
-        #             "epitope": list(self.simulation_data.epitope_residues),
-        #             "epitope_neighbourhood": list(
-        #                 self.simulation_data.epitope_neigh_residues
-        #             ),
-        #             "locked_epitope_neighbourhood": list(
-        #                 self.simulation_data.locked_epitope_neigh_residues
-        #             ),
-        #             "depth": depth,
-        #         },
-        #         f,
-        #     )
+        # Save residue ids to json
+        with open(os.path.join(self.tmp_dir, "simulated_residues.json"), "w") as f:
+            json.dump(
+                {
+                    "paratope": list(get_residues(binding_site.paratope_sel)),
+                    "paratope_neighbourhood": list(
+                        get_residues(binding_site.paratope_neigh_sel)
+                    ),
+                    "locked_paratope_neighbourhood": list(
+                        get_residues(binding_site.ext_paratope_neigh_sel)
+                    ),
+                    "epitope": list(get_residues(binding_site.epitope_sel)),
+                    "epitope_neighbourhood": list(
+                        get_residues(binding_site.epitope_neigh_sel)
+                    ),
+                    "locked_epitope_neighbourhood": list(
+                        get_residues(binding_site.ext_epitope_neigh_sel)
+                    ),
+                },
+                f,
+            )
 
-        cmd.set("pdb_conect_all", 1)
-        minimized_molecule = f"{fixed_molecule}_minimized"
-        self.minimize(
-            fixed_molecule,
-            minimized_molecule,
-            residues_to_atoms(
-                fixed_molecule,
-                get_residues(binding_site.ext_paratope_neigh_sel).union(
-                    get_residues(binding_site.ext_epitope_neigh_sel)
-                ),
-            ),
-        )
-        cmd.set("pdb_conect_all", 0)
-
-        pdb, system, integrator = self.create_system(minimized_molecule)
+        pdb, system, integrator = self.create_system(fixed_molecule)
 
         for i in range(system.getNumConstraints()):
             particle1, particle2, _ = system.getConstraintParameters(i)
             self.simulation_data.constrained_atoms.add(particle1)
             self.simulation_data.constrained_atoms.add(particle2)
 
-        self.simulation_data.final_molecule = minimized_molecule
-        self.simulation_data.binding_site = binding_site
-
-        restraint = CustomExternalForce("k*((x-x0)^2+(y-y0)^2+(z-z0)^2)")
-        system.addForce(restraint)
-        restraint.addGlobalParameter("k", 1000.0 * kilojoules_per_mole / nanometer)
-        restraint.addPerParticleParameter("x0")
-        restraint.addPerParticleParameter("y0")
-        restraint.addPerParticleParameter("z0")
-
         for atom in pdb.topology.atoms():
             if (
                 atom.index not in atoms_to_simulate
                 and atom.index not in self.simulation_data.constrained_atoms
             ):
-                if self.parameters.remove_non_simulated:
-                    restraint.addParticle(atom.index, pdb.positions[atom.index])
-                else:
-                    system.setParticleMass(atom.index, 0.0)
+                system.setParticleMass(atom.index, 0.0)
 
         simulation = Simulation(pdb.topology, system, integrator)
         self.enable_reporters(simulation)
         simulation.context.setPositions(pdb.positions)
+
+        print("Minimizing energy...")
+        simulation.minimizeEnergy(maxIterations=self.parameters.minimization_steps)
+        # Explicitly write the conect records. We will need them when we
+        # load the minimized molecule in connect_mode 1
+        minimized_molecule = f"{fixed_molecule}_minimized"
+        # cmd.set("pdb_conect_all", 1)
+        self.snapshot(simulation, f"{minimized_molecule}.pdb")
+        # cmd.set("pdb_conect_all", 0)
+
+        self.simulation_data.final_molecule = minimized_molecule
+        self.simulation_data.binding_site = binding_site
 
         if self.parameters.nvt_steps > 0:
             print("NVT Equilibration...")
