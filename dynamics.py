@@ -4,6 +4,7 @@ from enum import Enum, IntEnum, auto
 import threading
 import time
 import pathlib
+import tempfile
 
 from pymol.wizard import Wizard
 from pymol import cmd
@@ -12,12 +13,13 @@ from .molecular_dynamics.aa_simulation_handler import AllAtomSimulationHandler
 from .molecular_dynamics.simulation_params import SimulationParameters
 from .molecular_dynamics.binding_site import (
     BindingSite,
-    select_neighbourhood,
     get_residues,
 )
 
 
-def load_configuration(installed_wizard_path):
+def load_configuration(installed_wizard_path: pathlib.Path) -> SimulationParameters:
+    """Load simulation parameters from file and return them."""
+
     params = SimulationParameters()
 
     config_path = os.path.join(
@@ -28,7 +30,9 @@ def load_configuration(installed_wizard_path):
     return params
 
 
-def get_installed_wizard_path():
+def get_installed_wizard_path() -> pathlib.Path:
+    """Return the path to the installed wizard."""
+
     return pathlib.Path(__file__).parent.resolve()
 
 
@@ -40,6 +44,7 @@ class WizardState(IntEnum):
     MOLECULE_SELECTED = auto()
     CHAINS_SELECTED = auto()
     SIMULATION_READY = auto()
+    MINIMIZING_ENERGY = auto()
     RUNNING_SIMULATION = auto()
     SIMULATION_COMPLETE = auto()
 
@@ -99,6 +104,8 @@ class Dynamics(Wizard):
             ]
         elif self.status == WizardState.SIMULATION_READY:
             self.prompt = [f"Run to perform a simulation of {self.molecule}."]
+        elif self.status == WizardState.MINIMIZING_ENERGY:
+            self.prompt = ["Minimizing energy, please wait..."]
         elif self.status == WizardState.RUNNING_SIMULATION:
             self.prompt = ["Running simulation, please wait..."]
         elif self.status == WizardState.SIMULATION_COMPLETE:
@@ -413,28 +420,32 @@ class Dynamics(Wizard):
     def minimize_structure(self):
         """Minimize the energy of the selected molecule."""
 
-        if self.molecule is None:
-            print("Please select a molecule.")
-            return
-
         def aux():
-            tmp_dir = "deleteme"
-            os.makedirs(tmp_dir, exist_ok=True)
-            cmd.save(os.path.join(tmp_dir, f"{self.molecule}.pdb"), self.molecule)
+            if self.molecule is None:
+                print("Please select a molecule.")
+                return
 
-            simulation = AllAtomSimulationHandler(tmp_dir, self.sim_params)
-            fixed_molecule = "fixed"
-            simulation.fix_pdb(self.molecule, fixed_molecule)
-            minimized_molecule = "minimized"
-            simulation.minimize(fixed_molecule, minimized_molecule)
+            with tempfile.TemporaryDirectory() as tmp_dir:
+                cmd.save(os.path.join(tmp_dir, f"{self.molecule}.pdb"), self.molecule)
 
-            cmd.load(
-                os.path.join(tmp_dir, f"{minimized_molecule}.pdb"),
-                f"{self.molecule}_minimized",
-            )
-            shutil.rmtree(tmp_dir)
+                simulation = AllAtomSimulationHandler(tmp_dir, self.sim_params)
+                fixed_molecule = "fixed"
+                simulation.fix_pdb(self.molecule, fixed_molecule)
+                minimized_molecule = "minimized"
+                simulation.minimize(fixed_molecule, minimized_molecule)
+
+                cmd.load(
+                    os.path.join(tmp_dir, f"{minimized_molecule}.pdb"),
+                    f"{self.molecule}_minimized",
+                )
+
             cmd.disable(self.molecule)
+            self.update_status()
+            cmd.refresh_wizard()
+            print("Energy minimization complete.")
 
+        self.status = WizardState.MINIMIZING_ENERGY
+        cmd.refresh_wizard()
         worker_thread = threading.Thread(
             target=aux,
         )
