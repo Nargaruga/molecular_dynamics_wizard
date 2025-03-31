@@ -96,6 +96,7 @@ class BindingSite:
         for light_chain in self.light_chains:
             cmd.get_wizard().set_light_chain(light_chain)
         cmd.get_wizard().set_selection_name(self.paratope_sel)
+        cmd.get_wizard().set_highlight(False)
         cmd.get_wizard().run()
         cmd.get_wizard().toggle_label_pos()
         cmd.set_wizard()
