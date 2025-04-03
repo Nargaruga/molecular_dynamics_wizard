@@ -1,0 +1,19 @@
+name: pymol_molecular_dynamics
+channels:
+  - conda-forge
+  - bioconda
+  - defaults
+dependencies:
+  - numpy>=2.0
+  - pyyaml
+  - pdbfixer
+  - pyqt
+  - python=3.10
+  - glew
+  - libpng
+  - libnetcdf
+  - openmm
+  - freetype
+  - glm
+  - biopython
+  - hmmer=3.3.2

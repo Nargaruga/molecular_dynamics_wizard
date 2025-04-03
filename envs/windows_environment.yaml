@@ -4,10 +4,11 @@ channels:
   - bioconda
   - defaults
 dependencies:
+  - numpy>=2.0
   - pyyaml
   - pdbfixer
   - pyqt
-  - python=3.9
+  - python=3.10
   - glew
   - libpng
   - libnetcdf
@@ -15,5 +16,3 @@ dependencies:
   - freetype
   - glm
   - biopython
-  - hmmer=3.3.2
-prefix: /home/leo/anaconda3/envs/pymol_molecular_dynamics
