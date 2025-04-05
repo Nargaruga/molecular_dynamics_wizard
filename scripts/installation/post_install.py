@@ -34,6 +34,7 @@ def main():
                 "python",
                 installer_path,
                 paratope_wizard_root,
+                env_name,
             ],
             check=True,
         )
@@ -46,17 +47,31 @@ def main():
         os.path.join(wizard_root, "dynamics_settings_plugin", "installation_data.json"),
     )
 
-    subprocess.run(
-        [
-            "zip",
-            "-r",
-            "plugin.zip",
-            "dynamics_settings_plugin",
-
-        ],
-        cwd=wizard_root,
-        check=True,
-    )
+    if os.name == "nt":
+        subprocess.run(
+            prefix
+            + [
+                "Compress-Archive",
+                "-Path",
+                "dynamics_settings_plugin",
+                "-DestinationPath",
+                "plugin.zip",
+                "-Force",
+            ],
+            cwd=wizard_root,
+            check=True,
+        )
+    else:
+        subprocess.run(
+            [
+                "zip",
+                "-r",
+                "plugin.zip",
+                "dynamics_settings_plugin",
+            ],
+            cwd=wizard_root,
+            check=True,
+        )
 
 
 if __name__ == "__main__":
