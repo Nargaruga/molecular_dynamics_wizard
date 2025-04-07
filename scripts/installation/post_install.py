@@ -42,11 +42,6 @@ def main():
         print(f"Something went wrong while installing the paratope heatmap wizard: {e}")
         exit(1)
 
-    shutil.copy(
-        os.path.join(wizard_root, "installation_data.json"),
-        os.path.join(wizard_root, "dynamics_settings_plugin", "installation_data.json"),
-    )
-
     if os.name == "nt":
         subprocess.run(
             prefix

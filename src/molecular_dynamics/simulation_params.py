@@ -44,33 +44,28 @@ class SimulationParameters:
         print(f"Timestep: {self.timestep}")
         print(f"Report interval: {self.report_interval}")
 
-    def parse_file(self, file_name):
-        print(f"Reading configuration from {file_name}")
-        with open(file_name, "r") as file:
-            try:
-                config = yaml.safe_load(file)
+    def parse_yaml(self, yaml_str):
+        config = yaml.safe_load(yaml_str)
 
-                self.add_solvent = config["add_solvent"]
-                self.remove_non_simulated = config["remove_non_simulated"]
+        self.add_solvent = config["add_solvent"]
+        self.remove_non_simulated = config["remove_non_simulated"]
 
-                self.minimization_steps = config["minimization_steps"]
+        self.minimization_steps = config["minimization_steps"]
 
-                self.nvt_steps = config["nvt_steps"]
-                self.npt_steps = config["npt_steps"]
-                self.eq_pressure = config["eq_pressure"]
-                self.eq_temperature = config["eq_temperature"]
+        self.nvt_steps = config["nvt_steps"]
+        self.npt_steps = config["npt_steps"]
+        self.eq_pressure = config["eq_pressure"]
+        self.eq_temperature = config["eq_temperature"]
 
-                self.force_field = config["force_field"]
-                self.water_model = config["water_model"]
-                self.sim_steps = config["sim_steps"]
+        self.force_field = config["force_field"]
+        self.water_model = config["water_model"]
+        self.sim_steps = config["sim_steps"]
 
-                self.temperature = config["temperature"]
-                self.friction_coeff = config["friction_coeff"]
-                self.timestep = config["timestep"]
+        self.temperature = config["temperature"]
+        self.friction_coeff = config["friction_coeff"]
+        self.timestep = config["timestep"]
 
-                self.report_interval = config["report_interval"]
-            except yaml.YAMLError:
-                print(f'Error reading configuration file "{file_name}"')
+        self.report_interval = config["report_interval"]
 
     def serialize(self, file_name):
         print(f"Writing configuration to {file_name}")

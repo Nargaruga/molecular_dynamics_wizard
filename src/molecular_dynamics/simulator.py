@@ -42,7 +42,7 @@ def main():
 
     simulation_params_file = sys.argv[2]
     params = SimulationParameters()
-    params.parse_file(simulation_params_file)
+    params.parse_yaml(simulation_params_file)
 
     try:
         neighbourhood_radius = int(sys.argv[3])

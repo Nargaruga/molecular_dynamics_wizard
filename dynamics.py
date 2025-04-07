@@ -5,35 +5,35 @@ import threading
 import time
 import pathlib
 import tempfile
+import pkgutil
 
 from pymol.wizard import Wizard
+from pymol.wizarding import WizardError
 from pymol import cmd
 
-from .molecular_dynamics.aa_simulation_handler import AllAtomSimulationHandler
-from .molecular_dynamics.simulation_params import SimulationParameters
-from .molecular_dynamics.binding_site import (
+from molecular_dynamics.aa_simulation_handler import AllAtomSimulationHandler
+from molecular_dynamics.simulation_params import SimulationParameters
+from molecular_dynamics.binding_site import (
     BindingSite,
     get_residues,
 )
 
 
-def load_configuration(installed_wizard_path: pathlib.Path) -> SimulationParameters:
+def load_configuration() -> SimulationParameters:
     """Load simulation parameters from file and return them."""
 
     params = SimulationParameters()
 
-    config_path = os.path.join(
-        installed_wizard_path, "dynamics_extra", "simulation_params.yaml"
+    raw_yaml = pkgutil.get_data(
+        "molecular_dynamics", os.path.join("config", "simulation_params.yaml")
     )
-    params.parse_file(config_path)
+    if raw_yaml is None:
+        raise WizardError("Could not load simulation parameters.")
+
+    yaml_str = raw_yaml.decode("utf-8")
+    params.parse_yaml(yaml_str)
 
     return params
-
-
-def get_installed_wizard_path() -> pathlib.Path:
-    """Return the path to the installed wizard."""
-
-    return pathlib.Path(__file__).parent.resolve()
 
 
 class WizardState(IntEnum):
@@ -67,13 +67,12 @@ class Dynamics(Wizard):
 
     def __init__(self, _self=cmd):
         Wizard.__init__(self, _self)
-        os.chdir(get_installed_wizard_path())
 
         cmd.set("retain_order", 1)
         cmd.set("pdb_retain_ids", 1)
 
         self.status = WizardState.INITIALIZING
-        self.sim_params = load_configuration(get_installed_wizard_path())
+        self.sim_params = load_configuration()
         self.molecule = None
         self.heavy_chains = []
         self.light_chains = []
