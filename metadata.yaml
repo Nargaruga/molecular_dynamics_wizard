@@ -7,9 +7,5 @@ python_version: 3.10
 pymol_version: master
 openvr_version: 1.0.17
 
-extra_dirs:
-  - [molecular_dynamics, molecular_dynamics]
-  - [extra, dynamics_extra]
-
 pre_script: ""
 post_script: "scripts/installation/post_install.py"
