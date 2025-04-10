@@ -84,7 +84,7 @@ class Dynamics(Wizard):
         self.status = WizardState.READY
         self.binding_site = None
 
-    def get_prompt(self):
+    def get_prompt(self): # type: ignore
         """Return the prompt for the current state of the wizard."""
 
         self.prompt = None
@@ -112,7 +112,7 @@ class Dynamics(Wizard):
 
         return self.prompt
 
-    def get_panel(self):
+    def get_panel(self): # type: ignore
         """Return the menu panel for the wizard."""
 
         # Title
@@ -377,7 +377,7 @@ class Dynamics(Wizard):
     def update_coloring(self):
         """Update the coloring of the molecule based on the selected neighbourhood."""
 
-        if self.binding_site is None:
+        if self.molecule is None or self.binding_site is None:
             return
 
         cmd.color("grey", self.molecule)
