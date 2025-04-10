@@ -3,9 +3,9 @@ menu_entry: "Molecular Dynamics"
 default_env: pymol_molecular_dynamics
 use_vr: true
 
-python_version: 3.10
+python_version: "3.10"
 pymol_version: master
-openvr_version: 1.0.17
+openvr_version: "1.0.17"
 
 pre_script: ""
 post_script: "scripts/installation/post_install.py"
