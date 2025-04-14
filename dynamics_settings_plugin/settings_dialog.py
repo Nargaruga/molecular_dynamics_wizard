@@ -1,6 +1,6 @@
 import os
-import json
 from pathlib import Path
+import pkgutil
 
 from pymol.Qt import QtWidgets
 
@@ -11,6 +11,14 @@ plugin_root = Path(__file__).parent
 
 # global reference to avoid garbage collection of our dialog
 dialog = None
+
+CONFIG_PATH = os.path.join("config", "simulation_params.yaml")
+
+
+class PluginError(Exception):
+    """Custom exception for configuration errors."""
+
+    pass
 
 
 def run_plugin_gui():
@@ -27,41 +35,24 @@ def run_plugin_gui():
     dialog.show()
 
 
-def get_configuration_path():
-    install_data_path = os.path.join(plugin_root, "installation_data.json")
-    with open(install_data_path) as f:
-        data = json.load(f)
-        try:
-            installed_wizard_dir = data["installed_wizard_dir"]
-            return os.path.join(
-                installed_wizard_dir, "dynamics_extra", "simulation_params.yaml"
-            )
-        except KeyError:
-            print(
-                f"WARNING: Failed to read configuration file path from {install_data_path}."
-            )
-
-    return None
-
-
 def load_configuration():
     params = SimulationParameters()
 
-    config_path = get_configuration_path()
-    if config_path is None:
-        return params
-    else:
-        params.parse_file(config_path)
+    raw_yaml = pkgutil.get_data("molecular_dynamics", CONFIG_PATH)
+    if raw_yaml is None:
+        raise PluginError("Could not load simulation parameters.")
+
+    yaml_str = raw_yaml.decode("utf-8")
+    params.parse_yaml(yaml_str)
+
+    print(f"Loaded configuration from {CONFIG_PATH}")
 
     return params
 
 
 def save_configuration(params):
-    config_path = get_configuration_path()
-    if config_path is None:
-        return
-    else:
-        params.serialize(config_path)
+    params.serialize(CONFIG_PATH)
+    print(f"Saved configuration to {CONFIG_PATH}")
 
 
 def get_force_field_choices():
