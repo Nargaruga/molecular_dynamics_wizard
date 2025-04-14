@@ -22,6 +22,7 @@ Running a partial simulation requires you to select the antibody's heavy and lig
 - green (yellow): paratope (epitope) residues;
 - blue (cyan): residues neighbouring the paratope (epitope);
 - red (magenta): residues bordering the paratope (epitope) neighbourhood.
+
 Any residue not included in the above is removed from the molecule. Residues in the red (magenta) set are locked in place during the simulation. You can adjust the neighbourhood radius and depth as required to increase or decrease the portion of molecule to be simulated. The `Run Simulation` button starts the simulation in the background, automatically loading the trajectory as soon as it is ready.
 
 ### Configuration
