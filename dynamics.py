@@ -1,9 +1,7 @@
 import os
-import shutil
 from enum import Enum, IntEnum, auto
 import threading
 import time
-import pathlib
 import tempfile
 import pkgutil
 
@@ -36,17 +34,18 @@ def load_configuration() -> SimulationParameters:
     return params
 
 
-class WizardState(IntEnum):
-    """The possible states of the wizard."""
-
-    INITIALIZING = auto()
+class WizardInputState(IntEnum):
     READY = auto()
     MOLECULE_SELECTED = auto()
     CHAINS_SELECTED = auto()
     SIMULATION_READY = auto()
+
+
+class WizardTaskState(IntEnum):
+    IDLE = auto()
+    IDENTIFYING_BINDING_SITE = auto()
     MINIMIZING_ENERGY = auto()
     RUNNING_SIMULATION = auto()
-    SIMULATION_COMPLETE = auto()
 
 
 class SimulationType(Enum):
@@ -71,7 +70,6 @@ class Dynamics(Wizard):
         cmd.set("retain_order", 1)
         cmd.set("pdb_retain_ids", 1)
 
-        self.status = WizardState.INITIALIZING
         self.sim_params = load_configuration()
         self.molecule = None
         self.heavy_chains = []
@@ -81,47 +79,38 @@ class Dynamics(Wizard):
         self.sim_type = SimulationType.FULL
         self.populate_molecule_choices()
         self.populate_sim_type_choices()
-        self.status = WizardState.READY
         self.binding_site = None
+        self.input_state = WizardInputState.READY
+        self.task_state = WizardTaskState.IDLE
 
-    def get_prompt(self): # type: ignore
+    def get_prompt(self):  # type: ignore
         """Return the prompt for the current state of the wizard."""
 
-        self.prompt = None
-        if self.status == WizardState.INITIALIZING:
-            self.prompt = ["Initializing, please wait..."]
-        elif self.status == WizardState.READY:
-            self.prompt = ["Select a molecule."]
-        elif self.status == WizardState.MOLECULE_SELECTED:
-            if self.sim_type == SimulationType.PARTIAL:
-                self.prompt = [
-                    f"Select the heavy and light chains for {self.molecule}."
-                ]
-        elif self.status == WizardState.CHAINS_SELECTED:
-            self.prompt = [
-                f"Detect the binding site of {self.molecule}.",
-            ]
-        elif self.status == WizardState.SIMULATION_READY:
-            self.prompt = [f"Run to perform a simulation of {self.molecule}."]
-        elif self.status == WizardState.MINIMIZING_ENERGY:
-            self.prompt = ["Minimizing energy, please wait..."]
-        elif self.status == WizardState.RUNNING_SIMULATION:
-            self.prompt = ["Running simulation, please wait..."]
-        elif self.status == WizardState.SIMULATION_COMPLETE:
-            self.prompt = ["Simulation complete."]
+        prompt = []
+        if self.input_state == WizardInputState.READY:
+            prompt.append("Select a molecule to continue.")
+        elif self.input_state == WizardInputState.MOLECULE_SELECTED:
+            prompt.append("Select the heavy and light chains to continue.")
+        elif self.input_state == WizardInputState.CHAINS_SELECTED:
+            prompt.append("Identify the binding site to continue.")
+        elif self.input_state == WizardInputState.SIMULATION_READY:
+            prompt.append("The simulation is ready to be started.")
 
-        return self.prompt
+        if self.task_state == WizardTaskState.IDENTIFYING_BINDING_SITE:
+            prompt.append("Identifying binding site, please wait...")
+        elif self.task_state == WizardTaskState.MINIMIZING_ENERGY:
+            prompt.append("Minimizing energy, please wait...")
 
-    def get_panel(self): # type: ignore
-        """Return the menu panel for the wizard."""
+        return prompt
 
+    def get_panel(self):  # type: ignore
         # Title
         options = [
             [1, "Molecular Dynamics", ""],
         ]
 
         # Basic entries
-        if self.status >= WizardState.READY:
+        if self.input_state >= WizardInputState.READY:
             if self.molecule is None:
                 molecule_label = "Choose molecule"
             else:
@@ -136,7 +125,7 @@ class Dynamics(Wizard):
                 ]
             )
 
-        if self.status >= WizardState.MOLECULE_SELECTED:
+        if self.input_state >= WizardInputState.MOLECULE_SELECTED:
             options.extend(
                 [
                     [2, "Minimize Energy", "cmd.get_wizard().minimize_structure()"],
@@ -145,7 +134,7 @@ class Dynamics(Wizard):
 
         # Add entries for partial simulations
         if self.sim_type == SimulationType.PARTIAL:
-            if self.status >= WizardState.MOLECULE_SELECTED:
+            if self.input_state >= WizardInputState.MOLECULE_SELECTED:
                 heavy_chains_label = "Heavy Chains: "
                 if self.heavy_chains:
                     heavy_chains_label += ", ".join(self.heavy_chains)
@@ -165,7 +154,7 @@ class Dynamics(Wizard):
                     ]
                 )
 
-            if self.status >= WizardState.CHAINS_SELECTED:
+            if self.input_state >= WizardInputState.CHAINS_SELECTED:
                 options.extend(
                     [
                         [
@@ -176,7 +165,7 @@ class Dynamics(Wizard):
                     ]
                 )
 
-            if self.status >= WizardState.SIMULATION_READY:
+            if self.input_state >= WizardInputState.SIMULATION_READY:
                 radius_label = f"Neighbourhood Radius: {self.sim_radius}"
                 depth_label = f"Neighbourhood Depth: {self.sim_depth}"
 
@@ -187,7 +176,7 @@ class Dynamics(Wizard):
                     ]
                 )
 
-        if self.status >= WizardState.SIMULATION_READY:
+        if self.input_state >= WizardInputState.SIMULATION_READY:
             options.append(
                 [2, "Run Simulation", "cmd.get_wizard().run()"],
             )
@@ -195,6 +184,29 @@ class Dynamics(Wizard):
         options.append([2, "Dismiss", "cmd.set_wizard()"])
 
         return options
+
+    def update_input_state(self):
+        """Update the state of the wizard based on the current inputs."""
+
+        if self.molecule is None:
+            self.input_state = WizardInputState.READY
+            return
+
+        if self.sim_type == SimulationType.FULL:
+            # we only need the molecule for a full simulation
+            self.input_state = WizardInputState.SIMULATION_READY
+        else:
+            # partial simulations require additional inputs
+            if self.molecule:
+                self.input_state = WizardInputState.MOLECULE_SELECTED
+
+            if self.heavy_chains and self.light_chains:
+                self.input_state = WizardInputState.CHAINS_SELECTED
+
+            if self.binding_site:
+                self.input_state = WizardInputState.SIMULATION_READY
+
+        cmd.refresh_wizard()
 
     def populate_molecule_choices(self):
         """Populate the menu with the available molecules in the session."""
@@ -290,7 +302,7 @@ class Dynamics(Wizard):
 
         self.molecule = molecule
         self.populate_chain_choices()
-        self.update_status()
+        self.update_input_state()
         cmd.refresh_wizard()
 
     def set_heavy_chain(self, chain):
@@ -301,7 +313,7 @@ class Dynamics(Wizard):
         else:
             self.heavy_chains.append(chain)
 
-        self.update_status()
+        self.update_input_state()
         cmd.refresh_wizard()
 
     def set_light_chain(self, chain):
@@ -312,7 +324,7 @@ class Dynamics(Wizard):
         else:
             self.light_chains.append(chain)
 
-        self.update_status()
+        self.update_input_state()
         cmd.refresh_wizard()
 
     def set_sim_radius(self, radius):
@@ -336,35 +348,12 @@ class Dynamics(Wizard):
 
         if sim_type_str == "Full":
             self.sim_type = SimulationType.FULL
-            self.status = WizardState.SIMULATION_READY
         elif sim_type_str == "Partial":
             self.sim_type = SimulationType.PARTIAL
             self.populate_sim_radius_choices()
             self.populate_sim_depth_choices()
 
-        self.update_status()
-        cmd.refresh_wizard()
-
-    def update_status(self):
-        """Update the status of the wizard based on the current state."""
-
-        if self.molecule is None:
-            self.status = WizardState.READY
-            return
-
-        if self.sim_type == SimulationType.FULL:
-            self.status = WizardState.SIMULATION_READY
-            return
-
-        if self.light_chains and self.heavy_chains:
-            self.status = WizardState.CHAINS_SELECTED
-        else:
-            self.status = WizardState.MOLECULE_SELECTED
-            return
-
-        if self.binding_site:
-            self.status = WizardState.SIMULATION_READY
-
+        self.update_input_state()
         cmd.refresh_wizard()
 
     def update_neighbourhoods(self):
@@ -407,7 +396,7 @@ class Dynamics(Wizard):
 
         self.update_coloring()
 
-        self.status = WizardState.SIMULATION_READY
+        self.update_input_state()
         cmd.refresh_wizard()
 
     def color_residues(self, residues, color):
@@ -424,6 +413,9 @@ class Dynamics(Wizard):
                 print("Please select a molecule.")
                 return
 
+            self.task_state = WizardTaskState.MINIMIZING_ENERGY
+            cmd.refresh_wizard()
+
             with tempfile.TemporaryDirectory() as tmp_dir:
                 cmd.save(os.path.join(tmp_dir, f"{self.molecule}.pdb"), self.molecule)
 
@@ -439,11 +431,11 @@ class Dynamics(Wizard):
                 )
 
             cmd.disable(self.molecule)
-            self.update_status()
+            self.update_input_state()
+            self.task_state = WizardTaskState.IDLE
             cmd.refresh_wizard()
             print("Energy minimization complete.")
 
-        self.status = WizardState.MINIMIZING_ENERGY
         cmd.refresh_wizard()
         worker_thread = threading.Thread(
             target=aux,
@@ -457,17 +449,25 @@ class Dynamics(Wizard):
             print("Please select a molecule.")
             return
 
-        self.status = WizardState.RUNNING_SIMULATION
-        cmd.refresh_wizard()
-
         # Run the simulation on a separate thread to keep the interface responsive
-        if self.sim_type == SimulationType.FULL:
-            target_fun = self.run_full_simulation
-        else:
-            target_fun = self.run_partial_simulation
+        def aux():
+            self.task_state = WizardTaskState.RUNNING_SIMULATION
+            cmd.refresh_wizard()
+
+            try:
+                if self.sim_type == SimulationType.FULL:
+                    self.run_full_simulation()
+                else:
+                    self.run_partial_simulation()
+            except Exception as e:
+                print(f"Error while running simulation: {e}.")
+            finally:
+                self.update_input_state()
+                self.task_state = WizardTaskState.IDLE
+                cmd.refresh_wizard()
 
         worker_thread = threading.Thread(
-            target=target_fun,
+            target=aux,
         )
         worker_thread.start()
 
@@ -476,8 +476,6 @@ class Dynamics(Wizard):
 
         if self.molecule is None:
             print("Please select a molecule.")
-            self.update_status()
-            cmd.refresh_wizard()
             return
 
         tmp_dir = os.path.join(
@@ -486,26 +484,16 @@ class Dynamics(Wizard):
         )
         os.makedirs(tmp_dir)
         cmd.save(os.path.join(tmp_dir, f"{self.molecule}.pdb"), self.molecule)
-        try:
-            simulation = AllAtomSimulationHandler(tmp_dir, self.sim_params)
-            simulation.simulate(
-                self.molecule,
-            )
-        except Exception as e:
-            cmd.set_wizard()
-            print(f"Error while running simulation: {e}.")
-            self.update_status()
-            cmd.refresh_wizard()
-            raise e
+
+        simulation = AllAtomSimulationHandler(tmp_dir, self.sim_params)
+        simulation.simulate(
+            self.molecule,
+        )
 
         output_name = simulation.simulation_data.final_molecule
         cmd.load(os.path.join(tmp_dir, f"{output_name}.pdb"), output_name)
         cmd.load_traj(os.path.join(tmp_dir, "trajectory.dcd"), output_name)
-
         cmd.zoom(output_name)
-
-        self.status = WizardState.SIMULATION_COMPLETE
-        cmd.refresh_wizard()
 
         print(f"Done! Simulation files saved at {tmp_dir}")
 
@@ -514,8 +502,6 @@ class Dynamics(Wizard):
 
         if self.molecule is None:
             print("Please select a molecule.")
-            self.update_status()
-            cmd.refresh_wizard()
             return
 
         if self.binding_site is None:
@@ -527,15 +513,8 @@ class Dynamics(Wizard):
         )
         os.makedirs(tmp_dir)
         cmd.save(os.path.join(tmp_dir, f"{self.molecule}.pdb"), self.molecule)
-        try:
-            simulation = AllAtomSimulationHandler(tmp_dir, self.sim_params)
-            simulation.simulate_partial(self.molecule, self.binding_site)
-        except Exception as e:
-            cmd.set_wizard()
-            print(f"Error while running simulation: {e}.")
-            self.status = WizardState.READY
-            cmd.refresh_wizard()
-            raise e
+        simulation = AllAtomSimulationHandler(tmp_dir, self.sim_params)
+        simulation.simulate_partial(self.molecule, self.binding_site)
 
         simulation_data = simulation.simulation_data
         constrained_residues = set()
@@ -583,8 +562,5 @@ class Dynamics(Wizard):
 
         cmd.align(output_name, self.molecule)
         cmd.zoom(output_name)
-
-        self.status = WizardState.SIMULATION_COMPLETE
-        cmd.refresh_wizard()
 
         print(f"Done! Simulation files saved at {tmp_dir}")
