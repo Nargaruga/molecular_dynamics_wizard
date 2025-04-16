@@ -7,6 +7,7 @@
 *.cif
 *.zip
 
+simulations/
 inputs/
 tmp/
 results/
