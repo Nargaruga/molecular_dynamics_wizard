@@ -1,7 +1,6 @@
 name: dynamics
 menu_entry: "Molecular Dynamics"
 default_env: pymol_molecular_dynamics
-use_vr: true
 
 python_version: "3.10"
 pymol_version: master
