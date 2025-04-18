@@ -224,21 +224,52 @@ def compare_sims(base_dir: str, molecule_name: str, n_frames_str: str):
     avg_rmsf_l_by_neigh = []
     str_neighs = []
 
+    # We have one directory for each simulation
+    dirs = [
+        f.path for f in os.scandir(molecule_dir) if f.is_dir() and f.name != "ignore"
+    ]
+    if not dirs:
+        print("No simulation directories found")
+        return
+
+    # Find the directory containing the full simulation
+    full_sim_regex = re.compile(r".*_full")
+    full_sim_dir = None
+    for dir in dirs:
+        if full_sim_regex.match(dir):
+            full_sim_dir = dir
+            break
+
+    if not full_sim_dir:
+        print("No full simulation directory found")
+        return
+
+    # Load the full simulation
     final_full_molecule_file = os.path.join(
-        molecule_dir, f"{molecule_name}_minimized.pdb"
+        molecule_dir, full_sim_dir, f"{molecule_name}_minimized.pdb"
     )
-    final_full_traj_file = os.path.join(molecule_dir, "trajectory.dcd")
+    final_full_traj_file = os.path.join(molecule_dir, full_sim_dir, "trajectory.dcd")
     full_sim = mda.Universe(
         os.path.join(molecule_dir, final_full_molecule_file),
         final_full_traj_file,
     )
-
     minimized = mda.Universe(final_full_molecule_file)
 
-    with open(os.path.join(molecule_dir, "binding_site.json")) as f:
+    partial_sim_regex = re.compile(r".*_r([0-9]+)d([0-9]+)")
+    tmp = None
+    for dir in dirs:
+        if partial_sim_regex.match(dir):
+            tmp = dir
+            break
+
+    if not tmp:
+        print("No partial simulation directory found")
+        return
+
+    # Load the paratope residues from the json file
+    with open(os.path.join(molecule_dir, tmp, "simulated_residues.json")) as f:
         sim_metadata = json.load(f)
         paratope_residues = sim_metadata["paratope"]
-        # TODO consider epitope too?
 
     paratope_hc_selection = (
         "name CA and ("
@@ -271,23 +302,13 @@ def compare_sims(base_dir: str, molecule_name: str, n_frames_str: str):
         + ")"
     )
 
-    dirs = [
-        f.path
-        for f in os.scandir(os.path.join(molecule_dir, "partial_sims"))
-        if f.is_dir() and f.name != "ignore"
-    ]
-    if not dirs:
-        print("No simulation directories found")
-        return
-
-    partial_sim_regex = re.compile(r".*_r([0-9]+)d([0-9]+)")
-
     for i, dir in enumerate(dirs):
         if partial_sim_regex.match(dir):
             radius = partial_sim_regex.match(dir).group(1)
             depth = partial_sim_regex.match(dir).group(2)
         else:
             print(f"Skipping {dir}")
+            continue
 
         try:
             (
@@ -343,7 +364,7 @@ def compare_sims(base_dir: str, molecule_name: str, n_frames_str: str):
     avg_rmsf_l_by_neigh.append(average_rmsf([rmsf_l_full]))
 
     # get the time needed for the full simulation
-    with open(os.path.join(molecule_dir, "sim_state.csv")) as f:
+    with open(os.path.join(molecule_dir, full_sim_dir, "sim_state.csv")) as f:
         final_line = f.readlines()[-1].strip()
         avg_durations.append(float(final_line.split(",")[3]))
 
