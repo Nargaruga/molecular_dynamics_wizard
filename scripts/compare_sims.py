@@ -91,12 +91,24 @@ def plot_rmsf(
     if not rmsf_by_neigh or not str_neighs:
         return
 
-    for rmsf, c_alphas in rmsf_by_neigh:
-        ax.plot(c_alphas.resids, rmsf, linestyle="--", marker="o")
+    x = np.arange(len(rmsf_by_neigh[0][1].resids))
+    bar_width = 0.15
+    multiplier = 0
+    for (
+        rmsf,
+        _,
+    ), neigh_label in zip(rmsf_by_neigh, str_neighs):
+        offset = bar_width * multiplier
+        rects = ax.bar(x + offset, rmsf, width=bar_width, label=neigh_label)
+        ax.bar_label(rects, fmt='%.2f')
+        multiplier += 1
 
-    annotate_rmsf(ax, rmsf_by_neigh)
+    ax.set_xticks(x + bar_width, rmsf_by_neigh[0][1].resids)
+    ax.legend(
+        loc="upper left",
+        ncols=len(str_neighs),
+    )
 
-    ax.legend(str_neighs, title="Neighbourhood depth")
     ax.set_xlabel("Residue ID")
     ax.set_ylabel("RMSF (Å)")
 
@@ -110,14 +122,9 @@ def annotate_rmsf(ax: Axes, rmsf_by_neigh: list[tuple[list[float], mda.AtomGroup
             ax.annotate("(%s, %.2f)" % xy, xy=xy, textcoords="data")
 
 
-def remove_annotations(ax: Axes):
-    for annotation in ax.texts:
-        annotation.remove()
-
-
 def toggle_annotation(ax: Axes, rmsf_by_neigh):
     if ax.texts:
-        remove_annotations(ax)
+        ax.texts.clear()
     else:
         annotate_rmsf(ax, rmsf_by_neigh)
 
@@ -388,22 +395,22 @@ def compare_sims(base_dir: str, molecule_name: str, n_frames_str: str):
     # include the full simulation in the runtime plot
     plot_duration(dur_with_full_ax, avg_durations, str_neighs)
 
-    fig_rmsf_h, rmsf_ax_h = plt.subplots()
+    fig_rmsf_h, rmsf_ax_h = plt.subplots(layout="constrained")
     fig_rmsf_h.subplots_adjust(bottom=0.2)
     rmsf_ax_h.set_title("RMSF of the paratope on H")
-    ax_rmsf_h = fig_rmsf_h.add_axes((0.7, 0.05, 0.1, 0.075))
-    btn_rmsf_h = Button(ax_rmsf_h, "Annotate")
-    btn_rmsf_h.on_clicked(lambda _: toggle_annotation(rmsf_ax_h, avg_rmsf_h_by_neigh))
-    buttons.append(btn_rmsf_h)
+    # ax_rmsf_h = fig_rmsf_h.add_axes((0.7, 0.05, 0.1, 0.075))
+    # btn_rmsf_h = Button(ax_rmsf_h, "Annotate")
+    # btn_rmsf_h.on_clicked(lambda _: toggle_annotation(rmsf_ax_h, avg_rmsf_h_by_neigh))
+    # buttons.append(btn_rmsf_h)
     plot_rmsf(rmsf_ax_h, avg_rmsf_h_by_neigh, str_neighs)
 
-    fig_rmsf_l, rmsf_ax_l = plt.subplots()
+    fig_rmsf_l, rmsf_ax_l = plt.subplots(layout="constrained")
     fig_rmsf_l.subplots_adjust(bottom=0.2)
     rmsf_ax_l.set_title("RMSF of the paratope on L")
-    ax_rmsf_l = fig_rmsf_l.add_axes((0.7, 0.05, 0.1, 0.075))
-    btn_rmsf_l = Button(ax_rmsf_l, "Annotate")
-    btn_rmsf_l.on_clicked(lambda _: toggle_annotation(rmsf_ax_l, avg_rmsf_l_by_neigh))
-    buttons.append(btn_rmsf_l)
+    # ax_rmsf_l = fig_rmsf_l.add_axes((0.7, 0.05, 0.1, 0.075))
+    # btn_rmsf_l = Button(ax_rmsf_l, "Annotate")
+    # btn_rmsf_l.on_clicked(lambda _: toggle_annotation(rmsf_ax_l, avg_rmsf_l_by_neigh))
+    # buttons.append(btn_rmsf_l)
     plot_rmsf(rmsf_ax_l, avg_rmsf_l_by_neigh, str_neighs)
 
     # _, rmsf_ax_full = plt.subplots()
