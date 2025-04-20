@@ -436,7 +436,6 @@ class Dynamics(Wizard):
             cmd.refresh_wizard()
             print("Energy minimization complete.")
 
-        cmd.refresh_wizard()
         worker_thread = threading.Thread(
             target=aux,
         )
