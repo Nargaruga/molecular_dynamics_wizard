@@ -35,8 +35,7 @@ def main():
 
     if os.name == "nt":
         subprocess.run(
-            prefix
-            + [
+            [
                 "Compress-Archive",
                 "-Path",
                 "dynamics_settings_plugin",
