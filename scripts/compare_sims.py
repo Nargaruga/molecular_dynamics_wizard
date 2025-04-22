@@ -45,6 +45,7 @@ def plot_rmsd(
             [x + 1 for x in range(0, n_frames)],
             rmsd,
         )
+
     ax.legend(str_depths, title="Neighbourhood depth")
     ax.set_xlabel("Frame")
     ax.set_ylabel("RMSD (Å)")
@@ -100,7 +101,7 @@ def plot_rmsf(
     ), neigh_label in zip(rmsf_by_neigh, str_neighs):
         offset = bar_width * multiplier
         rects = ax.bar(x + offset, rmsf, width=bar_width, label=neigh_label)
-        ax.bar_label(rects, fmt='%.2f')
+        ax.bar_label(rects, fmt="%.2f")
         multiplier += 1
 
     ax.set_xticks(x + bar_width, rmsf_by_neigh[0][1].resids)
@@ -157,6 +158,7 @@ def process_sim(
     paratope_lc_selection: str,
     frames: int,
 ):
+    # TODO this code does no averaging anymore
     durations = []
     rmsd_runs = []
     rmsd_static_runs = []
@@ -180,7 +182,7 @@ def process_sim(
 
     rmsd_runs.append(rms.RMSD(partial, full_sim, select=paratope_selection).run())
     rmsd_static_runs.append(
-        rms.RMSD(partial, minimized, select=paratope_selection).run()
+        rms.RMSD(partial, minimized, select=paratope_selection).run(),
     )
 
     rmsf_h_runs.append(
@@ -257,7 +259,7 @@ def compare_sims(base_dir: str, molecule_name: str, n_frames_str: str):
     )
     final_full_traj_file = os.path.join(molecule_dir, full_sim_dir, "trajectory.dcd")
     full_sim = mda.Universe(
-        os.path.join(molecule_dir, final_full_molecule_file),
+        final_full_molecule_file,
         final_full_traj_file,
     )
     minimized = mda.Universe(final_full_molecule_file)
@@ -349,7 +351,9 @@ def compare_sims(base_dir: str, molecule_name: str, n_frames_str: str):
         avg_rmsf_l_by_neigh.append(avg_rmsf_l)
 
     rmsd_static_full = rms.RMSD(full_sim, minimized, select=paratope_selection).run()
-    avg_rmsd_by_neigh_static.append(average_rmsd([rmsd_static_full], n_frames))
+    avg_rmsd_by_neigh_static.append(
+        list(map(lambda x: x[2], rmsd_static_full.results.rmsd))
+    )
 
     # compute the rmsf for the paratope on the full simulation
     rmsf_h_full = compute_rmsf(
@@ -375,8 +379,6 @@ def compare_sims(base_dir: str, molecule_name: str, n_frames_str: str):
         final_line = f.readlines()[-1].strip()
         avg_durations.append(float(final_line.split(",")[3]))
 
-    str_neighs.append("Whole molecule")
-
     cmd.load(final_full_molecule_file, "full_sim")
     cmd.load(final_full_traj_file, "full_sim")
 
@@ -385,6 +387,7 @@ def compare_sims(base_dir: str, molecule_name: str, n_frames_str: str):
     rmsd_static_ax.set_title("Simulation VS static molecule")
     # compare each frame with the static paratope
     plot_rmsd(rmsd_static_ax, avg_rmsd_by_neigh_static, str_neighs, n_frames)
+    str_neighs.append("Whole molecule")
     # compare each frame of partial simulations with those of the full simulation
     plot_rmsd(rmsd_ax, avg_rmsd_by_neigh, str_neighs, n_frames)
 
@@ -396,7 +399,6 @@ def compare_sims(base_dir: str, molecule_name: str, n_frames_str: str):
     plot_duration(dur_with_full_ax, avg_durations, str_neighs)
 
     fig_rmsf_h, rmsf_ax_h = plt.subplots(layout="constrained")
-    fig_rmsf_h.subplots_adjust(bottom=0.2)
     rmsf_ax_h.set_title("RMSF of the paratope on H")
     # ax_rmsf_h = fig_rmsf_h.add_axes((0.7, 0.05, 0.1, 0.075))
     # btn_rmsf_h = Button(ax_rmsf_h, "Annotate")
@@ -405,7 +407,6 @@ def compare_sims(base_dir: str, molecule_name: str, n_frames_str: str):
     plot_rmsf(rmsf_ax_h, avg_rmsf_h_by_neigh, str_neighs)
 
     fig_rmsf_l, rmsf_ax_l = plt.subplots(layout="constrained")
-    fig_rmsf_l.subplots_adjust(bottom=0.2)
     rmsf_ax_l.set_title("RMSF of the paratope on L")
     # ax_rmsf_l = fig_rmsf_l.add_axes((0.7, 0.05, 0.1, 0.075))
     # btn_rmsf_l = Button(ax_rmsf_l, "Annotate")
