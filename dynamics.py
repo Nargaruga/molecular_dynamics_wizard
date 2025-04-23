@@ -390,14 +390,24 @@ class Dynamics(Wizard):
             print("Please select a molecule.")
             return
 
-        binding_site = BindingSite(self.molecule, self.heavy_chains, self.light_chains)
-        binding_site.select(self.sim_radius, self.sim_depth)
-        self.binding_site = binding_site
+        def aux():
+            self.task_state = WizardTaskState.IDENTIFYING_BINDING_SITE
+            cmd.refresh_wizard()
 
-        self.update_coloring()
+            binding_site = BindingSite(
+                self.molecule, self.heavy_chains, self.light_chains
+            )
+            binding_site.select(self.sim_radius, self.sim_depth)
+            self.binding_site = binding_site
 
-        self.update_input_state()
-        cmd.refresh_wizard()
+            self.update_coloring()
+            self.task_state = WizardTaskState.IDLE
+            self.update_input_state()
+
+        worked_thread = threading.Thread(
+            target=aux,
+        )
+        worked_thread.start()
 
     def color_residues(self, residues, color):
         """Colour the residues in the molecule with the specified colour."""
