@@ -70,33 +70,6 @@ class AllAtomSimulationHandler:
             keepIds=True,
         )
 
-    def identify_paratope(self, molecule, selection_name, heavy_chains, light_chains):
-        """Identify the paratope on the selected antibody through the appropriate wizard."""
-
-        cmd.wizard("paratope")
-        cmd.get_wizard().set_molecule(molecule)
-        for heavy_chain in heavy_chains:
-            cmd.get_wizard().set_heavy_chain(heavy_chain)
-        for light_chain in light_chains:
-            cmd.get_wizard().set_light_chain(light_chain)
-        cmd.get_wizard().set_selection_name(selection_name)
-        cmd.get_wizard().run()
-        cmd.get_wizard().toggle_label_pos()
-        cmd.set_wizard()
-
-    def select_epitope(
-        self, molecule, paratope_sel, selection_name, heavy_chains, light_chains
-    ):
-        """Get the residues of the epitope based on the paratope selection."""
-
-        epitope_sel = selection_name
-        cmd.select(
-            name=epitope_sel,
-            selection=f"byres {molecule} and not ("
-            + (" or ".join([f"chain {chain}" for chain in heavy_chains + light_chains]))
-            + f") near_to 6.0 of {paratope_sel}",
-        )
-
     def slice_object(self, molecule: str, residues_to_keep: set, output_name: str):
         selection = ""
         for resi, chain in residues_to_keep:
