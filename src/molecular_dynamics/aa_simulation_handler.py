@@ -113,19 +113,10 @@ class AllAtomSimulationHandler:
         self.snapshot(simulation, f"{output_name}.pdb")
 
     def simulate(self, molecule):
-        print("Fixing PDB...")
-        final_molecule = f"{molecule}_fixed"
-        self.fix_pdb(molecule, final_molecule)
-        self.simulation_data.final_molecule = final_molecule
-
-        pdb, system, integrator = self.create_system(final_molecule)
+        pdb, system, integrator = self.create_system(molecule)
         simulation = Simulation(pdb.topology, system, integrator)
         self.enable_reporters(simulation)
         simulation.context.setPositions(pdb.positions)
-
-        print("Minimizing energy...")
-        simulation.minimizeEnergy(maxIterations=self.parameters.minimization_steps)
-        self.snapshot(simulation, f"{molecule}_minimized.pdb")
 
         if self.parameters.nvt_steps > 0:
             print("NVT Equilibration...")
@@ -243,16 +234,7 @@ class AllAtomSimulationHandler:
         self.enable_reporters(simulation)
         simulation.context.setPositions(pdb.positions)
 
-        print("Minimizing energy...")
-        simulation.minimizeEnergy(maxIterations=self.parameters.minimization_steps)
-        # Explicitly write the conect records. We will need them when we
-        # load the minimized molecule in connect_mode 1
-        minimized_molecule = f"{fixed_molecule}_minimized"
-        # cmd.set("pdb_conect_all", 1)
-        self.snapshot(simulation, f"{minimized_molecule}.pdb")
-        # cmd.set("pdb_conect_all", 0)
-
-        self.simulation_data.final_molecule = minimized_molecule
+        self.simulation_data.final_molecule = fixed_molecule
         self.simulation_data.binding_site = binding_site
 
         if self.parameters.nvt_steps > 0:
