@@ -5,6 +5,7 @@ import pkgutil
 from pymol.Qt import QtWidgets
 
 from .settings_gui import Ui_Form
+import molecular_dynamics
 from molecular_dynamics.simulation_params import SimulationParameters
 
 plugin_root = Path(__file__).parent
@@ -45,14 +46,16 @@ def load_configuration():
     yaml_str = raw_yaml.decode("utf-8")
     params.parse_yaml(yaml_str)
 
-    print(f"Loaded configuration from {CONFIG_PATH}")
+    file_path = os.path.join(Path(molecular_dynamics.__file__).parent, CONFIG_PATH)
+    print(f"Loaded configuration from {file_path}")
 
     return params
 
 
 def save_configuration(params):
-    params.serialize(CONFIG_PATH)
-    print(f"Saved configuration to {CONFIG_PATH}")
+    file_path = os.path.join(Path(molecular_dynamics.__file__).parent, CONFIG_PATH)
+    params.serialize(file_path)
+    print(f"Saved configuration to {file_path}")
 
 
 def get_force_field_choices():
