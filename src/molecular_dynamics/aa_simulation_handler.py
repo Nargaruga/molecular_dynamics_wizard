@@ -46,6 +46,14 @@ class AllAtomSimulationHandler:
             filename=os.path.join(self.tmp_dir, f"{input_name}.pdb")
         )
         fixer.findMissingResidues()
+        chains = list(fixer.topology.chains())
+        keys_to_remove = []
+        for key in fixer.missingResidues.keys():
+            chain = chains[key[0]]
+            if key[1] == 0 or key[1] == len(list(chain.residues())):
+                keys_to_remove.append(key)
+        for key in keys_to_remove:
+            del fixer.missingResidues[key]
         fixer.findNonstandardResidues()
         fixer.replaceNonstandardResidues()
         fixer.removeHeterogens(keepWater=False)
