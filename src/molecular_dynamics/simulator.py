@@ -32,26 +32,38 @@ def setup_tmp_dir(pdb_path, params, extra=""):
 def main():
     if len(sys.argv) < 3:
         print(
-            "Usage: python simulator.py <pdb_path> <simulation_params_file> [neighbourhood_radius] [neighbourhood_depth] [chains_file]"
+            "Usage: python simulator.py <simulate|minimize> <pdb_path> <simulation_params_file> [neighbourhood_radius] [neighbourhood_depth] [chains_file]"
         )
         exit(1)
 
-    pdb_path = sys.argv[1]
+    command = sys.argv[1]
+    if command not in ["simulate", "minimize"]:
+        print("Invalid command. Use 'simulate' or 'minimize'.")
+        return
+
+    pdb_path = sys.argv[2]
     cmd.load(pdb_path)
     molecule_name = Path(pdb_path).stem
 
-    simulation_params_file = sys.argv[2]
+    simulation_params_file = sys.argv[3]
     params = SimulationParameters()
     with open(simulation_params_file, "r") as f:
         yaml_str = f.read()
         params.parse_yaml(yaml_str)
 
+    if command == "minimize":
+        simulation = AllAtomSimulationHandler(Path(pdb_path).parent, params)
+        fixed_molecule = f"{molecule_name}_fixed"
+        simulation.fix_pdb(molecule_name, fixed_molecule)
+        simulation.minimize(fixed_molecule, f"{molecule_name}_minimized")
+        return
+
     try:
-        neighbourhood_radius = int(sys.argv[3])
-        neighbourhood_depth = int(sys.argv[4])
+        neighbourhood_radius = int(sys.argv[4])
+        neighbourhood_depth = int(sys.argv[5])
 
         try:
-            chains_file = sys.argv[5]
+            chains_file = sys.argv[6]
         except IndexError:
             print("Missing heavy and light chain information.")
             return
@@ -72,7 +84,9 @@ def main():
     except IndexError:
         tmp_dir = setup_tmp_dir(pdb_path, params, "full")
         simulation = AllAtomSimulationHandler(tmp_dir, params)
-        simulation.simulate(molecule_name)
+        fixed_molecule = f"{molecule_name}_fixed"
+        simulation.fix_pdb(molecule_name, fixed_molecule)
+        simulation.simulate(fixed_molecule)
 
     print(f"Done! Simulation files saved at {tmp_dir}")
 
