@@ -7,6 +7,8 @@ def main():
     wizard_root = sys.argv[1]
     env_name = sys.argv[2]
 
+    plugin_name = "dynamics_settings_plugin"
+
     paratope_wizard_root = os.path.join(wizard_root, "ext", "paratope_heatmap_wizard")
 
     if os.name == "nt":
@@ -39,7 +41,7 @@ def main():
                 "powershell.exe",
                 "Compress-Archive",
                 "-Path",
-                "wizard_settings_plugin",
+                plugin_name,
                 "-DestinationPath",
                 "plugin.zip",
                 "-Force",
@@ -53,7 +55,7 @@ def main():
                 "zip",
                 "-r",
                 "plugin.zip",
-                "wizard_settings_plugin",
+                plugin_name,
             ],
             cwd=wizard_root,
             check=True,
