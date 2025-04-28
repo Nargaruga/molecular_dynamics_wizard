@@ -2,6 +2,7 @@ import os
 import os.path
 import json
 import re
+import csv
 
 import numpy as np
 from matplotlib.axes import Axes
@@ -51,6 +52,17 @@ def plot_rmsd(
     ax.set_ylabel("RMSD (Å)")
 
 
+def serialize_rmsd(rmsd: list[int], n_frames: int, filename: str):
+    if not rmsd or n_frames < 1:
+        return
+
+    with open(filename, "w") as f:
+        writer = csv.writer(f)
+        writer.writerow(["Frame", "RMSD"])
+        for frame in range(0, n_frames):
+            writer.writerow([frame + 1, rmsd[frame]])
+
+
 def compute_rmsf(topology: str, trajectory: str, selection_str: str):
     if topology == "" or trajectory == "":
         return None
@@ -69,6 +81,53 @@ def compute_rmsf(topology: str, trajectory: str, selection_str: str):
     rmsf = rms.RMSF(c_alphas).run()
 
     return rmsf, c_alphas
+
+
+def serialize_rmsf(rmsf: tuple[list[float], mda.AtomGroup], filename: str):
+    with open(filename, "w") as f:
+        writer = csv.writer(f)
+        writer.writerow(["resi", "RMSF"])
+        for resi, rmsf_val in zip(rmsf[1].resids, rmsf[0]):
+            writer.writerow([resi, rmsf_val])
+
+
+def serialize_comparison(
+    duration: float,
+    full_duration: float,
+    n_atoms: int,
+    full_n_atoms: int,
+    rmsf: tuple[list[float], mda.AtomGroup],
+    rmsd: list[int],
+    filename: str,
+):
+    with open(filename, "w") as f:
+        writer = csv.writer(f)
+        writer.writerow(
+            [
+                "Partial sim. duration",
+                "Full sim. Duration",
+                "Duration change",
+                "Partial size",
+                "Full size",
+                "Size change",
+                "Avg RMSD",
+                "Avg RMSF",
+            ]
+        )
+        avg_rmsd = sum(rmsd) / len(rmsd)
+        avg_rmsf = sum(rmsf[0]) / len(rmsf[0])
+        writer.writerow(
+            [
+                duration,
+                full_duration,
+                duration / full_duration,
+                n_atoms,
+                full_n_atoms,
+                n_atoms / full_n_atoms,
+                avg_rmsd,
+                avg_rmsf,
+            ]
+        )
 
 
 def average_rmsf(
@@ -93,8 +152,8 @@ def plot_rmsf(
         return
 
     x = np.arange(len(rmsf_by_neigh[0][1].resids))
-    bar_width = 0.15
-    multiplier = 0
+    bar_width = 0.05
+    multiplier = 2
     for (
         rmsf,
         _,
@@ -132,7 +191,7 @@ def toggle_annotation(ax: Axes, rmsf_by_neigh):
     plt.draw()
 
 
-def plot_duration(ax: Axes, entries: list[int], neighs: list[tuple[int, int]]):
+def plot_duration(ax: Axes, entries: list[int], neighs: list[str]):
     if not entries or not neighs:
         return
 
@@ -172,7 +231,7 @@ def process_sim(
         durations.append(float(final_line.split(",")[3]))
 
     final_molecule_file = os.path.join(
-        sim_dir, f"{molecule_name}_sliced_fixed_minimized.pdb"
+        sim_dir, f"{molecule_name}_minimized_sliced_fixed.pdb"
     )
 
     partial = mda.Universe(
@@ -207,9 +266,15 @@ def process_sim(
     avg_rmsf_h = average_rmsf(rmsf_h_runs)
     avg_rmsf_l = average_rmsf(rmsf_l_runs)
 
+    # serialize the results
+    serialize_rmsd(avg_rmsd, frames, os.path.join(sim_dir, "rmsd.csv"))
+    serialize_rmsd(avg_rmsd_static, frames, os.path.join(sim_dir, "rmsd_static.csv"))
+    serialize_rmsf(avg_rmsf_h, os.path.join(sim_dir, "rmsf_h.csv"))
+    serialize_rmsf(avg_rmsf_l, os.path.join(sim_dir, "rmsf_l.csv"))
+
     sim_name = f"sim_r{radius}d{depth}"
     cmd.load(
-        os.path.join(sim_dir, f"{molecule_name}_sliced_fixed_minimized.pdb"), sim_name
+        os.path.join(sim_dir, f"{molecule_name}_minimized_sliced_fixed.pdb"), sim_name
     )
     cmd.load(os.path.join(sim_dir, "trajectory.dcd"), sim_name)
 
@@ -219,6 +284,7 @@ def process_sim(
         avg_rmsd_static,
         avg_rmsf_h,
         avg_rmsf_l,
+        partial.atoms.n_atoms,
     )
 
 
@@ -231,7 +297,7 @@ def compare_sims(base_dir: str, molecule_name: str, n_frames_str: str):
     avg_rmsd_by_neigh_static = []
     avg_rmsf_h_by_neigh = []
     avg_rmsf_l_by_neigh = []
-    str_neighs = []
+    str_neighs = ["Whole molecule"]
 
     # We have one directory for each simulation
     dirs = [
@@ -311,6 +377,39 @@ def compare_sims(base_dir: str, molecule_name: str, n_frames_str: str):
         + ")"
     )
 
+    # compute the rmsf for the paratope on the full simulation
+    rmsf_h_full = compute_rmsf(
+        final_full_molecule_file,
+        final_full_traj_file,
+        paratope_hc_selection,
+    )
+    if not rmsf_h_full:
+        return
+    avg_rmsf_h_by_neigh.append(average_rmsf([rmsf_h_full]))
+
+    rmsf_l_full = compute_rmsf(
+        final_full_molecule_file,
+        final_full_traj_file,
+        paratope_lc_selection,
+    )
+    if not rmsf_l_full:
+        return
+    avg_rmsf_l_by_neigh.append(average_rmsf([rmsf_l_full]))
+
+    # compute the rmsd for the paratope on the full simulation
+    rmsd_static_full = rms.RMSD(full_sim, minimized, select=paratope_selection).run()
+    avg_rmsd_by_neigh_static.append(
+        list(map(lambda x: x[2], rmsd_static_full.results.rmsd))
+    )
+
+    # get the time needed for the full simulation
+    with open(os.path.join(molecule_dir, full_sim_dir, "sim_state.csv")) as f:
+        final_line = f.readlines()[-1].strip()
+        avg_durations.append(float(final_line.split(",")[3]))
+
+    cmd.load(final_full_molecule_file, "full_sim")
+    cmd.load(final_full_traj_file, "full_sim")
+
     for i, dir in enumerate(dirs):
         if partial_sim_regex.match(dir):
             radius = partial_sim_regex.match(dir).group(1)
@@ -326,6 +425,7 @@ def compare_sims(base_dir: str, molecule_name: str, n_frames_str: str):
                 avg_rmsd_static,
                 avg_rmsf_h,
                 avg_rmsf_l,
+                n_atoms,
             ) = process_sim(
                 molecule_name,
                 full_sim,
@@ -350,51 +450,28 @@ def compare_sims(base_dir: str, molecule_name: str, n_frames_str: str):
         avg_rmsf_h_by_neigh.append(avg_rmsf_h)
         avg_rmsf_l_by_neigh.append(avg_rmsf_l)
 
-    rmsd_static_full = rms.RMSD(full_sim, minimized, select=paratope_selection).run()
-    avg_rmsd_by_neigh_static.append(
-        list(map(lambda x: x[2], rmsd_static_full.results.rmsd))
-    )
-
-    # compute the rmsf for the paratope on the full simulation
-    rmsf_h_full = compute_rmsf(
-        final_full_molecule_file,
-        final_full_traj_file,
-        paratope_hc_selection,
-    )
-    if not rmsf_h_full:
-        return
-    avg_rmsf_h_by_neigh.append(average_rmsf([rmsf_h_full]))
-
-    rmsf_l_full = compute_rmsf(
-        final_full_molecule_file,
-        final_full_traj_file,
-        paratope_lc_selection,
-    )
-    if not rmsf_l_full:
-        return
-    avg_rmsf_l_by_neigh.append(average_rmsf([rmsf_l_full]))
-
-    # get the time needed for the full simulation
-    with open(os.path.join(molecule_dir, full_sim_dir, "sim_state.csv")) as f:
-        final_line = f.readlines()[-1].strip()
-        avg_durations.append(float(final_line.split(",")[3]))
-
-    cmd.load(final_full_molecule_file, "full_sim")
-    cmd.load(final_full_traj_file, "full_sim")
+        serialize_comparison(
+            avg_duration,
+            avg_durations[0],
+            n_atoms,
+            full_sim.atoms.n_atoms,
+            avg_rmsf_h,
+            avg_rmsd,
+            os.path.join(dir, "comparison.csv"),
+        )
 
     _, (rmsd_ax, rmsd_static_ax) = plt.subplots(2, 1)
     rmsd_ax.set_title("Partial VS full simulation")
     rmsd_static_ax.set_title("Simulation VS static molecule")
     # compare each frame with the static paratope
     plot_rmsd(rmsd_static_ax, avg_rmsd_by_neigh_static, str_neighs, n_frames)
-    str_neighs.append("Whole molecule")
     # compare each frame of partial simulations with those of the full simulation
-    plot_rmsd(rmsd_ax, avg_rmsd_by_neigh, str_neighs, n_frames)
+    plot_rmsd(rmsd_ax, avg_rmsd_by_neigh, str_neighs[1:], n_frames)
 
     _, (dur_ax, dur_with_full_ax) = plt.subplots(2, 1)
     dur_ax.set_title("Simulation duration")
     # plot durations only for partial simulations since they are much shorter than the full one
-    plot_duration(dur_ax, avg_durations[:-1], str_neighs[:-1])
+    plot_duration(dur_ax, avg_durations[1:], str_neighs[1:])
     # include the full simulation in the runtime plot
     plot_duration(dur_with_full_ax, avg_durations, str_neighs)
 
