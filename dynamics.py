@@ -4,6 +4,7 @@ import threading
 import time
 import tempfile
 import pkgutil
+import threading
 
 from pymol.wizard import Wizard
 from pymol.wizarding import WizardError
@@ -13,6 +14,7 @@ from molecular_dynamics.aa_simulation_handler import AllAtomSimulationHandler
 from molecular_dynamics.simulation_params import SimulationParameters
 from molecular_dynamics.binding_site import (
     BindingSite,
+    BindingSiteError,
     get_residues,
 )
 
@@ -41,8 +43,7 @@ class WizardInputState(IntEnum):
     SIMULATION_READY = auto()
 
 
-class WizardTaskState(IntEnum):
-    IDLE = auto()
+class WizardTask(IntEnum):
     IDENTIFYING_BINDING_SITE = auto()
     MINIMIZING_ENERGY = auto()
     RUNNING_SIMULATION = auto()
@@ -81,7 +82,10 @@ class Dynamics(Wizard):
         self.populate_sim_type_choices()
         self.binding_site = None
         self.input_state = WizardInputState.READY
-        self.task_state = WizardTaskState.IDLE
+        self.state_lock = threading.Lock()
+        self.tasks = []
+        self.tasks_lock = threading.Lock()
+        self.extra_msg = ""
 
     def get_prompt(self):  # type: ignore
         """Return the prompt for the current state of the wizard."""
@@ -96,10 +100,13 @@ class Dynamics(Wizard):
         elif self.input_state == WizardInputState.SIMULATION_READY:
             prompt.append("The simulation is ready to be started.")
 
-        if self.task_state == WizardTaskState.IDENTIFYING_BINDING_SITE:
-            prompt.append("Identifying binding site, please wait...")
-        elif self.task_state == WizardTaskState.MINIMIZING_ENERGY:
-            prompt.append("Minimizing energy, please wait...")
+        for task in self.tasks:
+            if task == WizardTask.IDENTIFYING_BINDING_SITE:
+                prompt.append("Detecting binding site, please wait...")
+            elif task == WizardTask.MINIMIZING_ENERGY:
+                prompt.append("Minimizing energy, please wait...")
+            elif task == WizardTask.RUNNING_SIMULATION:
+                prompt.append("Running simulation, please wait...")
 
         return prompt
 
@@ -184,6 +191,32 @@ class Dynamics(Wizard):
         options.append([2, "Dismiss", "cmd.set_wizard()"])
 
         return options
+
+    def add_task(self, task: WizardTask):
+        """Add a task to the list of tasks."""
+
+        if self.check_task(task):
+            return
+
+        with self.tasks_lock:
+            self.tasks.append(task)
+            cmd.refresh_wizard()
+
+    def remove_task(self, task: WizardTask):
+        """Remove a task from the list of tasks."""
+
+        if not self.check_task(task):
+            return
+
+        with self.tasks_lock:
+            self.tasks.remove(task)
+            cmd.refresh_wizard()
+
+    def check_task(self, task: WizardTask) -> bool:
+        """Check if a task is in the list of tasks."""
+
+        with self.tasks_lock:
+            return task in self.tasks
 
     def update_input_state(self):
         """Update the state of the wizard based on the current inputs."""
@@ -391,18 +424,32 @@ class Dynamics(Wizard):
             return
 
         def aux():
-            self.task_state = WizardTaskState.IDENTIFYING_BINDING_SITE
-            cmd.refresh_wizard()
+            if self.check_task(WizardTask.IDENTIFYING_BINDING_SITE):
+                self.extra_msg = (
+                    "Binding site detection is already in progress, please wait..."
+                )
+                print(self.extra_msg)
+                return
 
-            binding_site = BindingSite(
-                self.molecule, self.heavy_chains, self.light_chains
-            )
-            binding_site.select(self.sim_radius, self.sim_depth)
-            self.binding_site = binding_site
+            self.add_task(WizardTask.IDENTIFYING_BINDING_SITE)
+            try:
+                binding_site = BindingSite(
+                    self.molecule, self.heavy_chains, self.light_chains
+                )
+                binding_site.select(self.sim_radius, self.sim_depth)
+                self.binding_site = binding_site
+                self.extra_msg = ""
+                print("Binding site highlighted.")
+            except BindingSiteError as e:
+                print(f"Error while detecting binding site: {e}.")
+                self.binding_site = None
+                return
+            finally:
+                self.remove_task(WizardTask.IDENTIFYING_BINDING_SITE)
+                self.extra_msg = ""
+                self.update_input_state()
 
             self.update_coloring()
-            self.task_state = WizardTaskState.IDLE
-            self.update_input_state()
 
         worked_thread = threading.Thread(
             target=aux,
@@ -419,32 +466,38 @@ class Dynamics(Wizard):
         """Minimize the energy of the selected molecule."""
 
         def aux():
-            if self.molecule is None:
-                print("Please select a molecule.")
+            if self.check_task(WizardTask.MINIMIZING_ENERGY):
+                self.extra_msg = (
+                    "Energy minimization is already in progress, please wait..."
+                )
+                print(self.extra_msg)
                 return
 
-            self.task_state = WizardTaskState.MINIMIZING_ENERGY
-            cmd.refresh_wizard()
+            self.add_task(WizardTask.MINIMIZING_ENERGY)
+            try:
+                with tempfile.TemporaryDirectory() as tmp_dir:
+                    cmd.save(
+                        os.path.join(tmp_dir, f"{self.molecule}.pdb"), self.molecule
+                    )
 
-            with tempfile.TemporaryDirectory() as tmp_dir:
-                cmd.save(os.path.join(tmp_dir, f"{self.molecule}.pdb"), self.molecule)
+                    simulation = AllAtomSimulationHandler(tmp_dir, self.sim_params)
+                    fixed_molecule = "fixed"
+                    simulation.fix_pdb(self.molecule, fixed_molecule)
+                    minimized_molecule = "minimized"
+                    simulation.minimize(fixed_molecule, minimized_molecule)
 
-                simulation = AllAtomSimulationHandler(tmp_dir, self.sim_params)
-                fixed_molecule = "fixed"
-                simulation.fix_pdb(self.molecule, fixed_molecule)
-                minimized_molecule = "minimized"
-                simulation.minimize(fixed_molecule, minimized_molecule)
+                    cmd.load(
+                        os.path.join(tmp_dir, f"{minimized_molecule}.pdb"),
+                        f"{self.molecule}_minimized",
+                    )
 
-                cmd.load(
-                    os.path.join(tmp_dir, f"{minimized_molecule}.pdb"),
-                    f"{self.molecule}_minimized",
-                )
-
-            cmd.disable(self.molecule)
-            self.update_input_state()
-            self.task_state = WizardTaskState.IDLE
-            cmd.refresh_wizard()
-            print("Energy minimization complete.")
+                cmd.disable(self.molecule)
+                print("Energy minimization complete.")
+            # TODO: handle exceptions
+            finally:
+                self.remove_task(WizardTask.MINIMIZING_ENERGY)
+                self.extra_msg = ""
+                self.update_input_state()
 
         worker_thread = threading.Thread(
             target=aux,
@@ -460,9 +513,12 @@ class Dynamics(Wizard):
 
         # Run the simulation on a separate thread to keep the interface responsive
         def aux():
-            self.task_state = WizardTaskState.RUNNING_SIMULATION
-            cmd.refresh_wizard()
+            if self.check_task(WizardTask.RUNNING_SIMULATION):
+                self.extra_msg = "Simulation is already in progress, please wait..."
+                print(self.extra_msg)
+                return
 
+            self.add_task(WizardTask.RUNNING_SIMULATION)
             try:
                 if self.sim_type == SimulationType.FULL:
                     self.run_full_simulation()
@@ -471,9 +527,9 @@ class Dynamics(Wizard):
             except Exception as e:
                 print(f"Error while running simulation: {e}.")
             finally:
+                self.remove_task(WizardTask.RUNNING_SIMULATION)
+                self.extra_msg = ""
                 self.update_input_state()
-                self.task_state = WizardTaskState.IDLE
-                cmd.refresh_wizard()
 
         worker_thread = threading.Thread(
             target=aux,
