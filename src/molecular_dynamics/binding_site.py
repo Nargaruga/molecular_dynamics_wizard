@@ -1,7 +1,7 @@
 from pymol import cmd, CmdException
 
 
-class BindingSiteError:
+class BindingSiteError(Exception):
     """Custom exception for binding site errors."""
 
     pass
