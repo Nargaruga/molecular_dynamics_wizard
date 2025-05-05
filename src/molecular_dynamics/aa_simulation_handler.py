@@ -114,10 +114,11 @@ class AllAtomSimulationHandler:
 
     def simulate(self, molecule):
         print("Fixing PDB...")
-        fixed_molecule = f"{molecule}_fixed"
+        fixed_molecule = f"{molecule}_fix"
         self.fix_pdb(molecule, fixed_molecule)
         cmd.load(os.path.join(self.tmp_dir, f"{fixed_molecule}.pdb"), fixed_molecule)
         cmd.disable(fixed_molecule)
+        self.simulation_data.final_molecule = fixed_molecule
 
         pdb, system, integrator = self.create_system(fixed_molecule)
         simulation = Simulation(pdb.topology, system, integrator)
@@ -187,7 +188,6 @@ class AllAtomSimulationHandler:
             to_fix = molecule
 
         cmd.save(os.path.join(self.tmp_dir, f"{to_fix}.pdb"), to_fix)
-        cmd.disable(to_fix)
 
         print("Fixing PDB...")
         fixed_molecule = f"{to_fix}_fixed"
