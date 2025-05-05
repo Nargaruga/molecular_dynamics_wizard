@@ -369,7 +369,7 @@ class Dynamics(Wizard):
 
         self.sim_radius = radius
         self.update_neighbourhoods()
-        self.update_coloring()
+        self.update_coloring(self.molecule)
         cmd.refresh_wizard()
 
     def set_sim_depth(self, depth):
@@ -377,7 +377,7 @@ class Dynamics(Wizard):
 
         self.sim_depth = depth
         self.update_neighbourhoods()
-        self.update_coloring()
+        self.update_coloring(self.molecule)
         cmd.refresh_wizard()
 
     def set_sim_type(self, sim_type_str):
@@ -399,24 +399,32 @@ class Dynamics(Wizard):
 
         self.binding_site.update_neighbourhoods(self.sim_radius, self.sim_depth)
 
-    def update_coloring(self):
+    def update_coloring(self, molecule):
         """Update the coloring of the molecule based on the selected neighbourhood."""
 
-        if self.molecule is None or self.binding_site is None:
+        if self.binding_site is None:
             return
 
-        cmd.color("grey", self.molecule)
+        cmd.color("grey", molecule)
 
-        self.color_residues(get_residues(self.binding_site.paratope_sel), "green")
-        self.color_residues(get_residues(self.binding_site.paratope_neigh_sel), "blue")
         self.color_residues(
-            get_residues(self.binding_site.ext_paratope_neigh_sel), "red"
+            molecule, get_residues(self.binding_site.paratope_sel), "green"
+        )
+        self.color_residues(
+            molecule, get_residues(self.binding_site.paratope_neigh_sel), "blue"
+        )
+        self.color_residues(
+            molecule, get_residues(self.binding_site.ext_paratope_neigh_sel), "red"
         )
 
-        self.color_residues(get_residues(self.binding_site.epitope_sel), "yellow")
-        self.color_residues(get_residues(self.binding_site.epitope_neigh_sel), "cyan")
         self.color_residues(
-            get_residues(self.binding_site.ext_epitope_neigh_sel), "magenta"
+            molecule, get_residues(self.binding_site.epitope_sel), "yellow"
+        )
+        self.color_residues(
+            molecule, get_residues(self.binding_site.epitope_neigh_sel), "cyan"
+        )
+        self.color_residues(
+            molecule, get_residues(self.binding_site.ext_epitope_neigh_sel), "magenta"
         )
 
     def detect_binding_site(self):
@@ -442,6 +450,7 @@ class Dynamics(Wizard):
                 binding_site.select(self.sim_radius, self.sim_depth)
                 self.binding_site = binding_site
                 self.extra_msg = ""
+                self.update_coloring(self.molecule)
                 print("Binding site highlighted.")
             except BindingSiteError as e:
                 print(f"Error while detecting binding site: {e}.")
@@ -452,18 +461,16 @@ class Dynamics(Wizard):
                 self.extra_msg = ""
                 self.update_input_state()
 
-            self.update_coloring()
-
         worked_thread = threading.Thread(
             target=aux,
         )
         worked_thread.start()
 
-    def color_residues(self, residues, color):
+    def color_residues(self, molecule, residues, color):
         """Colour the residues in the molecule with the specified colour."""
 
         for resi, chain in residues:
-            cmd.color(color, f"{self.molecule} and resi {resi} and chain {chain}")
+            cmd.color(color, f"{molecule} and resi {resi} and chain {chain}")
 
     def minimize_structure(self):
         """Minimize the energy of the selected molecule."""
@@ -581,54 +588,31 @@ class Dynamics(Wizard):
         )
         os.makedirs(tmp_dir)
         cmd.save(os.path.join(tmp_dir, f"{self.molecule}.pdb"), self.molecule)
+
         simulation = AllAtomSimulationHandler(tmp_dir, self.sim_params)
         simulation.simulate_partial(self.molecule, self.binding_site)
 
-        simulation_data = simulation.simulation_data
-        constrained_residues = set()
-        for atom in simulation_data.constrained_atoms:
-            cmd.select(
-                "constrained_atoms",
-                f"byres {simulation.simulation_data.final_molecule} and index {atom}",
-            )
-        if len(simulation_data.constrained_atoms) > 0:
-            cmd.iterate(
-                "constrained_atoms",
-                "constrained_residues.add((resi, chain))",
-                space=locals(),
-            )
+        # constrained_residues = set()
+        # for atom in simulation_data.constrained_atoms:
+        #     cmd.select(
+        #         "constrained_atoms",
+        #         f"byres {simulation.simulation_data.final_molecule} and index {atom}",
+        #     )
+        # if len(simulation_data.constrained_atoms) > 0:
+        #     cmd.iterate(
+        #         "constrained_atoms",
+        #         "constrained_residues.add((resi, chain))",
+        #         space=locals(),
+        #     )
 
         output_name = simulation.simulation_data.final_molecule
         cmd.disable(self.molecule)
-        cmd.load(os.path.join(tmp_dir, f"{output_name}.pdb"), output_name)
         cmd.load_traj(os.path.join(tmp_dir, "trajectory.dcd"), output_name)
-        cmd.show_as("licorice", output_name)
 
-        # Colour the residues
-        cmd.color("grey", f"{output_name}")
-
-        for resi, chain in get_residues(self.binding_site.ext_paratope_neigh_sel):
-            cmd.color("red", f"{output_name} and resi {resi} and chain {chain}")
-
-        for resi, chain in get_residues(self.binding_site.paratope_neigh_sel):
-            cmd.color("blue", f"{output_name} and resi {resi} and chain {chain}")
-
-        for resi, chain in get_residues(self.binding_site.paratope_sel):
-            cmd.color("green", f"{output_name} and resi {resi} and chain {chain}")
-
-        for resi, chain in get_residues(self.binding_site.ext_epitope_neigh_sel):
-            cmd.color("magenta", f"{output_name} and resi {resi} and chain {chain}")
-
-        for resi, chain in get_residues(self.binding_site.epitope_neigh_sel):
-            cmd.color("cyan", f"{output_name} and resi {resi} and chain {chain}")
-
-        for resi, chain in get_residues(self.binding_site.epitope_sel):
-            cmd.color("yellow", f"{output_name} and resi {resi} and chain {chain}")
-
-        for resi, chain in constrained_residues:
-            cmd.color("black", f"{output_name} and resi {resi} and chain {chain}")
-
+        self.update_coloring(output_name)
         cmd.align(output_name, self.molecule)
-        cmd.zoom(output_name)
+        cmd.disable(self.molecule)
+        cmd.enable(output_name)
+        cmd.orient(output_name)
 
         print(f"Done! Simulation files saved at {tmp_dir}")
