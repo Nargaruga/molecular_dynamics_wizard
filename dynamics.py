@@ -8,7 +8,7 @@ import threading
 
 from pymol.wizard import Wizard
 from pymol.wizarding import WizardError
-from pymol import cmd
+from pymol import cmd, CmdException
 
 from molecular_dynamics.aa_simulation_handler import AllAtomSimulationHandler
 from molecular_dynamics.simulation_params import SimulationParameters
@@ -399,6 +399,21 @@ class Dynamics(Wizard):
 
         self.update_input_state()
 
+    def attempt_autocomplete(self):
+        cmd.wizard("paratope")
+        cmd.get_wizard().set_molecule(self.molecule)
+        chains = cmd.get_wizard().fetch_cached_chains()
+        cmd.set_wizard()
+
+        if chains is None:
+            return
+
+        if chains.heavy_chains:
+            self.heavy_chains = chains.heavy_chains
+        if chains.light_chains:
+            self.light_chains = chains.light_chains
+        self.update_input_state()
+
     def set_molecule(self, molecule):
         """Set the molecule to simulate."""
 
@@ -407,6 +422,7 @@ class Dynamics(Wizard):
         self.heavy_chains = []
         self.light_chains = []
         self.populate_chain_choices()
+        self.attempt_autocomplete()
         self.update_input_state()
 
     def set_heavy_chain(self, chain):
@@ -547,6 +563,10 @@ class Dynamics(Wizard):
         """Minimize the energy of the selected molecule."""
 
         def aux():
+            if self.molecule is None:
+                print("Please select a molecule.")
+                return
+
             if self.check_task(WizardTask.MINIMIZING_ENERGY):
                 self.extra_msg = (
                     "Energy minimization is already in progress, please wait..."
