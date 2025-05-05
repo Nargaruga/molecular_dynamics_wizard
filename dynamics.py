@@ -586,7 +586,8 @@ class Dynamics(Wizard):
             return
 
         if self.binding_site is None:
-            self.detect_binding_site()
+            print("Please perform binding site detection first.")
+            return
 
         tmp_dir = os.path.join(
             "simulations",
