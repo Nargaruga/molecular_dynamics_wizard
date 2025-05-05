@@ -343,7 +343,6 @@ class Dynamics(Wizard):
         self.light_chains = []
         self.populate_chain_choices()
         self.update_input_state()
-        cmd.refresh_wizard()
 
     def set_heavy_chain(self, chain):
         """Set the heavy chain to be used for the heatmap."""
@@ -354,7 +353,6 @@ class Dynamics(Wizard):
             self.heavy_chains.append(chain)
 
         self.update_input_state()
-        cmd.refresh_wizard()
 
     def set_light_chain(self, chain):
         """Set the light chain to be used for the heatmap."""
@@ -365,7 +363,6 @@ class Dynamics(Wizard):
             self.light_chains.append(chain)
 
         self.update_input_state()
-        cmd.refresh_wizard()
 
     def set_sim_radius(self, radius):
         """Set the radius of the paratope neighbourhood to simulate."""
@@ -394,7 +391,6 @@ class Dynamics(Wizard):
             self.populate_sim_depth_choices()
 
         self.update_input_state()
-        cmd.refresh_wizard()
 
     def update_neighbourhoods(self):
         if self.binding_site is None:
