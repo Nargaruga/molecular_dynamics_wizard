@@ -502,6 +502,11 @@ class Dynamics(Wizard):
                     )
 
                 cmd.disable(self.molecule)
+
+                # TODO locking might be necessary here
+                self.populate_molecule_choices()
+                self.set_molecule(f"{self.molecule}_min")
+
                 print("Energy minimization complete.")
             # TODO: handle exceptions
             finally:
