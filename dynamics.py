@@ -289,10 +289,9 @@ class Dynamics(Wizard):
         self.menu["sim_radius"] = [[2, "Neighbourhood Radius", ""]]
         radii = [
             0,
-            5,
-            10,
-            15,
-            20,
+            2,
+            4,
+            8,
         ]  # Angstrom TODO: generate based on the cutoff distance in the simulation parameters
         for r in radii:
             self.menu["sim_radius"].append(
@@ -307,7 +306,12 @@ class Dynamics(Wizard):
         """Populate the menu with the possible values for the depth of the paratope neighbourhood to simulate."""
 
         self.menu["sim_depth"] = [[2, "Neighbourhood Residues", ""]]
-        depths = [0, 2, 4, 8, 10]
+        depths = [
+            0,
+            2,
+            4,
+            8,
+        ]
         for d in depths:
             self.menu["sim_depth"].append(
                 [
