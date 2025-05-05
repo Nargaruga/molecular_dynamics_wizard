@@ -385,6 +385,7 @@ class Dynamics(Wizard):
 
     def set_paratope_selection(self, selection):
         self.custom_paratope = selection
+        self.transfer_paratope_selection(self.molecule)
         self.update_input_state()
 
     def toggle_paratope_detection_mode(self):
@@ -559,6 +560,29 @@ class Dynamics(Wizard):
         for resi, chain in residues:
             cmd.color(color, f"{molecule} and resi {resi} and chain {chain}")
 
+    def transfer_paratope_selection(self, new_molecule):
+        """Transfer the paratope selection to the new molecule."""
+
+        if self.custom_paratope is None:
+            return
+
+        selected_residues = set()
+        try:
+            cmd.iterate(
+                self.custom_paratope,
+                "selected_residues.add((resi, chain))",
+                space={"selected_residues": selected_residues},
+            )
+            cmd.delete(self.custom_paratope)
+            for resi, chain in selected_residues:
+                cmd.select(
+                    self.custom_paratope,
+                    f"{new_molecule} and resi {resi} and chain {chain}",
+                    merge=1,
+                )
+        except CmdException as e:
+            raise BindingSiteError(f"Error transferring paratope selection: {e}") from e
+
     def minimize_structure(self):
         """Minimize the energy of the selected molecule."""
 
@@ -591,6 +615,12 @@ class Dynamics(Wizard):
                         os.path.join(tmp_dir, f"{minimized_molecule}.pdb"),
                         f"{self.molecule}_min",
                     )
+
+                    if (
+                        self.paratope_detection_type == ParatopeDetectionType.EXISTING
+                        and self.custom_paratope
+                    ):
+                        self.transfer_paratope_selection(f"{self.molecule}_min")
 
                 cmd.disable(self.molecule)
 
