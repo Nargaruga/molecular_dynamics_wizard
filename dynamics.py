@@ -338,6 +338,9 @@ class Dynamics(Wizard):
         """Set the molecule to simulate."""
 
         self.molecule = molecule
+        self.binding_site = None
+        self.heavy_chains = []
+        self.light_chains = []
         self.populate_chain_choices()
         self.update_input_state()
         cmd.refresh_wizard()
