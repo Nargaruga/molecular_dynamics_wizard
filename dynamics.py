@@ -498,7 +498,7 @@ class Dynamics(Wizard):
 
                     cmd.load(
                         os.path.join(tmp_dir, f"{minimized_molecule}.pdb"),
-                        f"{self.molecule}_minimized",
+                        f"{self.molecule}_min",
                     )
 
                 cmd.disable(self.molecule)

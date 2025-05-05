@@ -74,12 +74,12 @@ class BindingSite:
         self.molecule = molecule
         self.heavy_chains = heavy_chains
         self.light_chains = light_chains
-        self.paratope_sel = f"{molecule}_paratope"
-        self.epitope_sel = f"{molecule}_epitope"
-        self.paratope_neigh_sel = f"{molecule}_paratope_neigh"
-        self.epitope_neigh_sel = f"{molecule}_epitope_neigh"
-        self.ext_paratope_neigh_sel = f"{molecule}_ext_paratope_neigh"
-        self.ext_epitope_neigh_sel = f"{molecule}_ext_epitope_neigh"
+        self.paratope_sel = f"{molecule}_par"
+        self.epitope_sel = f"{molecule}_epi"
+        self.paratope_neigh_sel = f"{molecule}_par_neigh"
+        self.epitope_neigh_sel = f"{molecule}_epi_neigh"
+        self.ext_paratope_neigh_sel = f"{molecule}_ext_par_neigh"
+        self.ext_epitope_neigh_sel = f"{molecule}_ext_epi_neigh"
 
     def select(self, radius, depth):
         try:
@@ -103,8 +103,8 @@ class BindingSite:
 
         self.select_paratope_neigh(radius, depth)
         self.select_epitope_neigh(radius, depth)
-        self.select_paratope_ext_neigh()
-        self.select_epitope_ext_neigh()
+        self.select_ext_paratope_neigh()
+        self.select_ext_epitope_neigh()
 
         remove_overlap(self.ext_paratope_neigh_sel, self.paratope_neigh_sel)
         remove_overlap(self.paratope_neigh_sel, self.paratope_sel)
