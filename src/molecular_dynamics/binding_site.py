@@ -82,13 +82,11 @@ class BindingSite:
         self.ext_epitope_neigh_sel = f"{molecule}_ext_epi_neigh"
 
     def select(self, radius, depth):
-        try:
-            cmd.delete(self.paratope_sel)
-            cmd.delete(self.epitope_sel)
-        except CmdException as e:
-            raise BindingSiteError(f"Error deleting selections: {e}") from e
+        cmd.delete(self.epitope_sel)
 
-        self.select_paratope()
+        if not self.paratope_sel:
+            self.select_paratope()
+
         self.select_epitope()
         self.update_neighbourhoods(radius, depth)
 

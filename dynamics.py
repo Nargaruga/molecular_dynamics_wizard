@@ -40,6 +40,7 @@ class WizardInputState(IntEnum):
     READY = auto()
     MOLECULE_SELECTED = auto()
     CHAINS_SELECTED = auto()
+    PARATOPE_SELECTED = auto()
     SIMULATION_READY = auto()
 
 
@@ -47,6 +48,11 @@ class WizardTask(IntEnum):
     IDENTIFYING_BINDING_SITE = auto()
     MINIMIZING_ENERGY = auto()
     RUNNING_SIMULATION = auto()
+
+
+class ParatopeDetectionType(Enum):
+    EXISTING = auto()
+    NEW = auto()
 
 
 class SimulationType(Enum):
@@ -80,6 +86,8 @@ class Dynamics(Wizard):
         self.sim_type = SimulationType.FULL
         self.populate_molecule_choices()
         self.populate_sim_type_choices()
+        self.paratope_detection_type = ParatopeDetectionType.NEW
+        self.custom_paratope = None
         self.binding_site = None
         self.input_state = WizardInputState.READY
         self.state_lock = threading.Lock()
@@ -142,6 +150,19 @@ class Dynamics(Wizard):
         # Add entries for partial simulations
         if self.sim_type == SimulationType.PARTIAL:
             if self.input_state >= WizardInputState.MOLECULE_SELECTED:
+                paratope_detection_type_label = "Mode: "
+                if self.paratope_detection_type == ParatopeDetectionType.NEW:
+                    paratope_detection_type_label += "New paratope"
+                else:
+                    paratope_detection_type_label += "Existing paratope"
+
+                options.append(
+                    [
+                        2,
+                        paratope_detection_type_label,
+                        "cmd.get_wizard().toggle_paratope_detection_mode()",
+                    ],
+                )
                 heavy_chains_label = "Heavy Chains: "
                 if self.heavy_chains:
                     heavy_chains_label += ", ".join(self.heavy_chains)
@@ -161,16 +182,27 @@ class Dynamics(Wizard):
                     ]
                 )
 
+            detect_binging_site_btn = [
+                2,
+                "Detect Binding Site",
+                "cmd.get_wizard().detect_binding_site()",
+            ]
+
             if self.input_state >= WizardInputState.CHAINS_SELECTED:
-                options.extend(
-                    [
-                        [
-                            2,
-                            "Detect Binding Site",
-                            "cmd.get_wizard().detect_binding_site()",
-                        ]
-                    ]
-                )
+                if self.paratope_detection_type == ParatopeDetectionType.EXISTING:
+                    paratope_selection_label = "Paratope: "
+                    if self.custom_paratope:
+                        paratope_selection_label += self.custom_paratope
+                    else:
+                        paratope_selection_label += "None"
+                    options.append(
+                        [3, paratope_selection_label, "paratope_selection"],
+                    )
+                elif self.paratope_detection_type == ParatopeDetectionType.NEW:
+                    options.append(detect_binging_site_btn)
+
+            if self.input_state >= WizardInputState.PARATOPE_SELECTED:
+                options.append(detect_binging_site_btn)
 
             if self.input_state >= WizardInputState.SIMULATION_READY:
                 radius_label = f"Neighbourhood Radius: {self.sim_radius}"
@@ -235,6 +267,12 @@ class Dynamics(Wizard):
 
             if self.heavy_chains and self.light_chains:
                 self.input_state = WizardInputState.CHAINS_SELECTED
+
+            if (
+                self.paratope_detection_type == ParatopeDetectionType.EXISTING
+                and self.custom_paratope
+            ):
+                self.input_state = WizardInputState.PARATOPE_SELECTED
 
             if self.binding_site:
                 self.input_state = WizardInputState.SIMULATION_READY
@@ -333,6 +371,33 @@ class Dynamics(Wizard):
                     'cmd.get_wizard().set_sim_type("' + sim_type.value + '")',
                 ]
             )
+
+    def populate_paratope_selection_choices(self):
+        self.menu["paratope_selection"] = [[2, "Paratope Selection", ""]]
+        for selection in cmd.get_names("selections"):
+            self.menu["paratope_selection"].append(
+                [
+                    1,
+                    selection,
+                    'cmd.get_wizard().set_paratope_selection("' + selection + '")',
+                ]
+            )
+
+    def set_paratope_selection(self, selection):
+        self.custom_paratope = selection
+        self.update_input_state()
+
+    def toggle_paratope_detection_mode(self):
+        """Toggle between existing and new paratope detection modes."""
+
+        if self.paratope_detection_type == ParatopeDetectionType.NEW:
+            self.paratope_detection_type = ParatopeDetectionType.EXISTING
+            self.populate_paratope_selection_choices()
+        else:
+            self.paratope_detection_type = ParatopeDetectionType.NEW
+            self.populate_chain_choices()
+
+        self.update_input_state()
 
     def set_molecule(self, molecule):
         """Set the molecule to simulate."""
@@ -447,6 +512,12 @@ class Dynamics(Wizard):
                 binding_site = BindingSite(
                     self.molecule, self.heavy_chains, self.light_chains
                 )
+                if (
+                    self.paratope_detection_type == ParatopeDetectionType.EXISTING
+                    and self.custom_paratope
+                ):
+                    print(f"Using existing paratope selection: {self.custom_paratope}")
+                    binding_site.paratope_sel = self.custom_paratope
                 binding_site.select(self.sim_radius, self.sim_depth)
                 self.binding_site = binding_site
                 self.extra_msg = ""
