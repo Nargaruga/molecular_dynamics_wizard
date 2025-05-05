@@ -7,13 +7,13 @@ class BindingSiteError(Exception):
     pass
 
 
-def select_neighbourhood(new_sel, base_sel, chains, radius=1, depth=1):
+def select_neighbourhood(new_sel, base_sel, allowed_sel, radius=0, depth=1):
     # Expand the base selection by a given radius
     try:
         if radius > 0:
             cmd.select(
                 name=new_sel,
-                selection=f"byres {base_sel} expand {radius} and ({chains})",
+                selection=f"byres {base_sel} expand {radius} and ({allowed_sel})",
                 merge=1,
             )
         else:
@@ -23,7 +23,7 @@ def select_neighbourhood(new_sel, base_sel, chains, radius=1, depth=1):
         if depth > 0:
             cmd.select(
                 name=new_sel,
-                selection=f"byres {new_sel} extend {depth} and ({chains})",
+                selection=f"byres {new_sel} extend {depth} and ({allowed_sel})",
                 merge=1,
             )
     except CmdException as e:
@@ -34,7 +34,7 @@ def remove_overlap(sel1, sel2):
     try:
         cmd.select(
             name=sel1,
-            selection=f"{sel1} and not ({sel2})",
+            selection=f"byres {sel1} and not byres {sel2}",
         )
     except CmdException as e:
         raise BindingSiteError(f"Error removing overlap: {e}") from e
@@ -46,7 +46,7 @@ def get_residues(selection_name):
         cmd.iterate(
             f"{selection_name}",
             "residues.add((resi, chain))",
-            space=locals(),
+            space={"residues": residues},
         )
         return residues
 
@@ -61,7 +61,7 @@ def residues_to_atoms(molecule: str, residues: set) -> set:
             cmd.iterate(
                 f"{molecule} and resi {residue[0]} and chain {residue[1]}",
                 "atoms.add(index)",
-                space=locals(),
+                space={"atoms": atoms},
             )
         return atoms
 
@@ -150,52 +150,90 @@ class BindingSite:
         except CmdException as e:
             raise BindingSiteError(f"Error selecting epitope: {e}") from e
 
-    def select_paratope_neigh(self, radius=1, depth=1):
+    def select_paratope_neigh(self, radius, depth):
+        allowed_sel = (
+            f"byres {self.molecule} and ("
+            + (
+                " or ".join(
+                    [
+                        f"chain {chain}"
+                        for chain in self.heavy_chains + self.light_chains
+                    ]
+                )
+            )
+            + ")"
+        )
+
         select_neighbourhood(
             self.paratope_neigh_sel,
             self.paratope_sel,
-            " or ".join(
-                [f"chain {chain}" for chain in self.heavy_chains + self.light_chains]
-            ),
+            allowed_sel,
             radius,
             depth,
         )
 
     def select_epitope_neigh(
         self,
-        radius=1,
-        depth=1,
+        radius,
+        depth,
     ):
+        allowed_sel = (
+            f"byres {self.molecule} and ("
+            + (
+                " and ".join(
+                    [
+                        f"not chain {chain}"
+                        for chain in self.heavy_chains + self.light_chains
+                    ]
+                )
+            )
+            + ")"
+        )
+
         select_neighbourhood(
             self.epitope_neigh_sel,
             self.epitope_sel,
-            " and ".join(
-                [
-                    f"not chain {chain}"
-                    for chain in self.heavy_chains + self.light_chains
-                ]
-            ),
+            allowed_sel,
             radius,
             depth,
         )
 
-    def select_paratope_ext_neigh(self):
+    def select_ext_paratope_neigh(self):
+        allowed_sel = (
+            f"byres {self.molecule} and ("
+            + (
+                " or ".join(
+                    [
+                        f"chain {chain}"
+                        for chain in self.heavy_chains + self.light_chains
+                    ]
+                )
+            )
+            + ")"
+        )
+
         select_neighbourhood(
             self.ext_paratope_neigh_sel,
             self.paratope_neigh_sel,
-            " or ".join(
-                [f"chain {chain}" for chain in self.heavy_chains + self.light_chains]
-            ),
+            allowed_sel,
         )
 
-    def select_epitope_ext_neigh(self):
+    def select_ext_epitope_neigh(self):
+        allowed_sel = (
+            f"byres {self.molecule} and ("
+            + (
+                " and ".join(
+                    [
+                        f"not chain {chain}"
+                        for chain in self.heavy_chains + self.light_chains
+                    ]
+                )
+            )
+            + ")"
+        )
+
         select_neighbourhood(
             self.ext_epitope_neigh_sel,
             self.epitope_neigh_sel,
-            " and ".join(
-                [
-                    f"not chain {chain}"
-                    for chain in self.heavy_chains + self.light_chains
-                ]
-            ),
+            allowed_sel,
         )
