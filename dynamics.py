@@ -566,9 +566,10 @@ class Dynamics(Wizard):
         )
 
         output_name = simulation.simulation_data.final_molecule
-        cmd.load(os.path.join(tmp_dir, f"{output_name}.pdb"), output_name)
         cmd.load_traj(os.path.join(tmp_dir, "trajectory.dcd"), output_name)
-        cmd.zoom(output_name)
+        cmd.disable(self.molecule)
+        cmd.enable(output_name)
+        cmd.orient(output_name)
 
         print(f"Done! Simulation files saved at {tmp_dir}")
 
