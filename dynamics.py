@@ -413,10 +413,8 @@ class Dynamics(Wizard):
         if chains is None:
             return
 
-        if chains.heavy_chains:
-            self.heavy_chains = chains.heavy_chains
-        if chains.light_chains:
-            self.light_chains = chains.light_chains
+        self.heavy_chains = chains.heavy_chains
+        self.light_chains = chains.light_chains
         self.update_input_state()
 
     def set_molecule(self, molecule):
@@ -516,10 +514,6 @@ class Dynamics(Wizard):
     def detect_binding_site(self):
         """Detect the binding site of the selected molecule."""
 
-        if self.molecule is None:
-            print("Please select a molecule.")
-            return
-
         def aux():
             if self.check_task(WizardTask.IDENTIFYING_BINDING_SITE):
                 self.extra_msg = (
@@ -528,22 +522,37 @@ class Dynamics(Wizard):
                 print(self.extra_msg)
                 return
 
+            if self.molecule is None:
+                print("Please select a molecule.")
+                return
+
             self.add_task(WizardTask.IDENTIFYING_BINDING_SITE)
             try:
+                if self.binding_site is not None:
+                    print("Deleting selections...")
+                    self.binding_site.reset()
+
                 binding_site = BindingSite(
                     self.molecule, self.heavy_chains, self.light_chains
                 )
-                if (
-                    self.paratope_detection_type == ParatopeDetectionType.EXISTING
-                    and self.custom_paratope
-                ):
+
+                if self.paratope_detection_type == ParatopeDetectionType.EXISTING:
+                    if self.custom_paratope is None:
+                        print("Please choose a paratope selection.")
+                        return
+
                     print(f"Using existing paratope selection: {self.custom_paratope}")
                     binding_site.paratope_sel = self.custom_paratope
-                binding_site.select(self.sim_radius, self.sim_depth)
+                elif self.paratope_detection_type == ParatopeDetectionType.NEW:
+                    binding_site.select_paratope()
+
+                binding_site.select_epitope()
+                binding_site.update_neighbourhoods(self.sim_radius, self.sim_depth)
                 self.binding_site = binding_site
                 self.extra_msg = ""
                 self.update_coloring(self.molecule)
-                print("Binding site highlighted.")
+                cmd.show_as("licorice", self.molecule)
+                print(f"Binding site highlighted on {self.molecule}.")
             except BindingSiteError as e:
                 print(f"Error while detecting binding site: {e}.")
                 self.binding_site = None

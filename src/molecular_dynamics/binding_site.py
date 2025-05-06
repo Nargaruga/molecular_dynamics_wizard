@@ -81,14 +81,17 @@ class BindingSite:
         self.ext_paratope_neigh_sel = f"{molecule}_ext_par_neigh"
         self.ext_epitope_neigh_sel = f"{molecule}_ext_epi_neigh"
 
-    def select(self, radius, depth):
-        cmd.delete(self.epitope_sel)
-
-        if not self.paratope_sel:
-            self.select_paratope()
-
-        self.select_epitope()
-        self.update_neighbourhoods(radius, depth)
+    def reset(self):
+        """Reset the binding site selections."""
+        try:
+            cmd.delete(self.paratope_sel)
+            cmd.delete(self.epitope_sel)
+            cmd.delete(self.paratope_neigh_sel)
+            cmd.delete(self.epitope_neigh_sel)
+            cmd.delete(self.ext_paratope_neigh_sel)
+            cmd.delete(self.ext_epitope_neigh_sel)
+        except CmdException as e:
+            raise BindingSiteError(f"Error deleting selections: {e}") from e
 
     def update_neighbourhoods(self, radius, depth):
         try:
@@ -113,13 +116,20 @@ class BindingSite:
     def select_paratope(self):
         """Identify the paratope on the selected antibody through the appropriate wizard."""
 
+        print(
+            f"Selecting paratope for {self.molecule}, chains {self.heavy_chains} and {self.light_chains}..."
+        )
         try:
             cmd.wizard("paratope")
             cmd.get_wizard().set_molecule(self.molecule)
+
             for heavy_chain in self.heavy_chains:
-                cmd.get_wizard().set_heavy_chain(heavy_chain)
+                if not cmd.get_wizard().is_heavy_chain_selected(heavy_chain):
+                    cmd.get_wizard().toggle_heavy_chain(heavy_chain)
             for light_chain in self.light_chains:
-                cmd.get_wizard().set_light_chain(light_chain)
+                if not cmd.get_wizard().is_light_chain_selected(light_chain):
+                    cmd.get_wizard().toggle_light_chain(light_chain)
+
             cmd.get_wizard().set_selection_name(self.paratope_sel)
             cmd.get_wizard().set_highlight(False)
             cmd.get_wizard().run(block=True)

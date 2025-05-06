@@ -78,7 +78,9 @@ def main():
         )
         simulation = AllAtomSimulationHandler(tmp_dir, params)
         binding_site = BindingSite(molecule_name, heavy_chains, light_chains)
-        binding_site.select(neighbourhood_radius, neighbourhood_depth)
+        binding_site.select_paratope()
+        binding_site.select_epitope()
+        binding_site.update_neighbourhoods(neighbourhood_radius, neighbourhood_depth)
         simulation.simulate_partial(molecule_name, binding_site)
 
     except IndexError:
