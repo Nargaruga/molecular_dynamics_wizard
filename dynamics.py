@@ -269,7 +269,7 @@ class Dynamics(Wizard):
             if self.molecule:
                 self.input_state = WizardInputState.MOLECULE_SELECTED
 
-            if self.heavy_chains and self.light_chains:
+            if self.heavy_chains or self.light_chains:
                 self.input_state = WizardInputState.CHAINS_SELECTED
 
             if (
