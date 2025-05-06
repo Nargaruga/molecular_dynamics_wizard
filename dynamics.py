@@ -201,7 +201,11 @@ class Dynamics(Wizard):
                 elif self.paratope_detection_type == ParatopeDetectionType.NEW:
                     options.append(detect_binging_site_btn)
 
-            if self.input_state >= WizardInputState.PARATOPE_SELECTED:
+            # TODO this is becoming a mess
+            if (
+                self.input_state >= WizardInputState.PARATOPE_SELECTED
+                and self.paratope_detection_type == ParatopeDetectionType.EXISTING
+            ):
                 options.append(detect_binging_site_btn)
 
             if self.input_state >= WizardInputState.SIMULATION_READY:
