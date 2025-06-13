@@ -707,8 +707,10 @@ class Dynamics(Wizard):
             print("Please select a molecule.")
             return
 
+        user_dir = os.path.expanduser("~")
+        base_dir = os.path.join(user_dir, "simulations")
         tmp_dir = os.path.join(
-            "simulations",
+            base_dir,
             f"{self.molecule}_{time.strftime('%Y-%m-%d_%H-%M-%S')}_full",
         )
         os.makedirs(tmp_dir)
@@ -738,8 +740,10 @@ class Dynamics(Wizard):
             print("Please perform binding site detection first.")
             return
 
+        user_dir = os.path.expanduser("~")
+        base_dir = os.path.join(user_dir, "simulations")
         tmp_dir = os.path.join(
-            "simulations",
+            base_dir,
             f"{self.molecule}_{time.strftime('%Y-%m-%d_%H-%M-%S')}_s{self.sim_params.sim_steps}_r{self.sim_radius}d{self.sim_depth}",
         )
         os.makedirs(tmp_dir)
