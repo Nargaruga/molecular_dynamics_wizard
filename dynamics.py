@@ -567,7 +567,6 @@ class Dynamics(Wizard):
                 self.binding_site = binding_site
                 self.extra_msg = ""
                 self.update_coloring(self.molecule)
-                cmd.show_as("licorice", self.molecule)
                 print(f"Binding site highlighted on {self.molecule}.")
             except BindingSiteError as e:
                 print(f"Error while detecting binding site: {e}.")
@@ -722,7 +721,7 @@ class Dynamics(Wizard):
 
         output_name = simulation.simulation_data.final_molecule
         cmd.load_traj(os.path.join(tmp_dir, "trajectory.dcd"), output_name)
-        cmd.disable(self.molecule)
+        cmd.disable("all")
         cmd.enable(output_name)
         cmd.orient(output_name)
 
@@ -768,7 +767,7 @@ class Dynamics(Wizard):
 
         self.update_coloring(output_name)
         cmd.align(output_name, self.molecule)
-        cmd.disable(self.molecule)
+        cmd.disable("all")
         cmd.enable(output_name)
         cmd.orient(output_name)
 
