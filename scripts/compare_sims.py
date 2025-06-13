@@ -8,7 +8,6 @@ import csv
 import numpy as np
 from matplotlib.axes import Axes
 import matplotlib.pyplot as plt
-from matplotlib.widgets import Button
 import seaborn as sns
 import pandas as pd
 
@@ -16,11 +15,9 @@ from pymol import cmd
 import MDAnalysis as mda  # TODO cite the use of rms and align as required by (https://userguide.mdanalysis.org/stable/examples/analysis/alignment_and_rms/rmsf.html)
 from MDAnalysis.analysis import rms, align
 
-
-sns.set_theme()
-
-
 buttons = []
+
+sns.set_theme(style="whitegrid", font_scale=1)
 
 
 class EmptySelectionError(Exception):
@@ -97,6 +94,10 @@ def average_rmsd_over_runs(runs: list[rms.RMSD], n_frames: int) -> list[int]:
     for frame in range(0, n_frames):
         avg_rmsd.append(sum([run.results.rmsd[frame][2] for run in runs]) / len(runs))
 
+    for run in runs:
+        print("---RMSD---")
+        print(run.results.rmsd)
+
     return avg_rmsd
 
 
@@ -105,29 +106,6 @@ def average_rmsd(rmsd: list[float]):
         return []
 
     return sum(rmsd) / len(rmsd)
-
-
-# def plot_rmsd(
-#     ax: Axes,
-#     sims: list[Simulation],
-#     n_frames: int,
-# ):
-#     for sim in sims:
-#         if not sim.rmsd:
-#             continue
-
-#         ax.plot(
-#             range(n_frames),
-#             sim.rmsd,
-#             label=sim.label,
-#         )
-
-#     ax.legend(
-#         loc="upper left",
-#         ncols=len(sims),
-#     )
-#     ax.set_xlabel("Frame")
-#     ax.set_ylabel("RMSD (Å)")
 
 
 def plot_rmsd_static(
@@ -153,17 +131,6 @@ def plot_rmsd_static(
     ax.set_ylabel("RMSD (Å)")
 
 
-# def serialize_rmsd(rmsd: list[int], n_frames: int, filename: str):
-#     if not rmsd or n_frames < 1:
-#         return
-
-#     with open(filename, "w") as f:
-#         writer = csv.writer(f)
-#         writer.writerow(["Frame", "RMSD"])
-#         for frame in range(0, n_frames):
-#             writer.writerow([frame + 1, rmsd[frame]])
-
-
 def get_row(radius):
     if radius == 0:
         row = 0
@@ -174,38 +141,6 @@ def get_row(radius):
     else:
         raise ComparisonError("Invalid radius")
     return row
-
-
-def plot_heatmap(rmsf_by_neigh: list[tuple[list[tuple[int, float]], int, int]]):
-    """Plot a heatmap of the mean RMSD for a given neighbourhood depth and radius."""
-
-    if not rmsf_by_neigh:
-        return
-
-    rmsf_matrix = np.zeros((len(rmsf_by_neigh), len(rmsf_by_neigh[0][0])))
-    for rmsf, radius, depth in rmsf_by_neigh:
-        row = get_row(radius)
-        for resid, val in rmsf:
-            np.append(rmsf_matrix[row], val)
-
-    fig, ax = plt.subplots()
-    sns.heatmap(
-        rmsf_matrix,
-        annot=True,
-        fmt=".2f",
-        ax=ax,
-    )
-
-    resids = []
-    resids.extend([resid for resid, _ in rmsf_by_neigh[0][0]])
-
-    ax.set_xlabel("Residue ID")
-    ax.set_ylabel("Neighbourhood depth")
-    ax.set_title("RMSF by neighbourhood depth and radius")
-    ax.set_xticklabels(resids)
-    ax.set_yticklabels([f"r{radius}d{depth}" for _, radius, depth in rmsf_by_neigh])
-    plt.tight_layout()
-    plt.show()
 
 
 def compute_rmsf(topology: str, trajectory: str, selection_str: str) -> RMSF | None:
@@ -232,14 +167,6 @@ def compute_rmsf(topology: str, trajectory: str, selection_str: str) -> RMSF | N
         list(c_alphas.resids),
         list(rmsf.rmsf),
     )
-
-
-# def serialize_rmsf(rmsf: tuple[list[float], mda.AtomGroup], filename: str):
-#     with open(filename, "w") as f:
-#         writer = csv.writer(f)
-#         writer.writerow(["resi", "RMSF"])
-#         for resi, rmsf_val in zip(rmsf[1].resids, rmsf[0]):
-#             writer.writerow([resi, rmsf_val])
 
 
 def average_rmsf_over_runs(
@@ -270,35 +197,6 @@ def average_rmsf(rmsf: list[float]) -> float:
     return sum(rmsf) / len(rmsf)
 
 
-# def plot_rmsf(ax: Axes, sims: list[Simulation], chain: str):
-#     if not sims:
-#         return
-
-#     for sim in sims:
-#         if chain == "heavy":
-#             rmsf = sim.rmsf_h
-#         elif chain == "light":
-#             rmsf = sim.rmsf_l
-#         else:
-#             raise ComparisonError("Invalid chain type")
-
-#         if not rmsf:
-#             continue
-
-#         ax.plot(
-#             rmsf[1].resids,
-#             rmsf[0],
-#             label=sim.label,
-#         )
-
-#     ax.legend(
-#         loc="upper left",
-#         ncols=len(sims),
-#     )
-#     ax.set_xlabel("Residue ID")
-#     ax.set_ylabel("RMSF (Å)")
-
-
 def annotate_rmsf(ax: Axes, rmsf_by_neigh: list[tuple[list[float], mda.AtomGroup]]):
     if not rmsf_by_neigh:
         return
@@ -317,22 +215,29 @@ def toggle_annotation(ax: Axes, rmsf_by_neigh):
     plt.draw()
 
 
-# def plot_duration(ax: Axes, sims: list[Simulation]):
-#     if not sims:
-#         return
+def plot_duration(molecule_dir: str):
+    molecule_name = Path(molecule_dir).name
+    comparison_file = os.path.join(molecule_dir, f"{molecule_name}_comparison.csv")
 
-#     x = np.arange(len(sims))
-#     bar_width = 0.05
-#     multiplier = 2
-#     for sim in sims:
-#         offset = bar_width * multiplier
-#         rects = ax.bar(x + offset, sim.duration, width=bar_width, label=sim.label)
-#         ax.bar_label(rects, fmt="%.2f")
-#         multiplier += 1
+    data = pd.read_csv(comparison_file)
+    data.drop(
+        data.columns.difference(["Label", "Duration"]), axis="columns", inplace=True
+    )
+    data["Label"] = data["Label"].replace("Whole Molecule", "Totale")
 
-#     ax.set_ylim(bottom=0)
-#     ax.set_xlabel("Neighbourhood depth")
-#     ax.set_ylabel("Duration (s)")
+    g = sns.barplot(x=data["Label"], y=data["Duration"])
+
+    g.set_xlabel("Tipo di Simulazione")
+    g.set_ylabel("Durata (s)")
+    for bars in g.containers:
+        g.bar_label(bars, fmt="%.1f")
+
+    g.relim()
+    g.margins(y=0.08)
+    plt.tight_layout()
+
+    plt.savefig(os.path.join(molecule_dir, f"{molecule_name}_duration.png"))
+    plt.close("all")
 
 
 def process_partial_sim(
@@ -359,11 +264,12 @@ def process_partial_sim(
     n_atoms = -1
     for sim_dir in sim_dirs:
         with open(os.path.join(sim_dir, "sim_state.csv")) as f:
+            print(f"Processing {sim_dir}")
             final_line = f.readlines()[-1].strip()
             durations.append(float(final_line.split(",")[3]))
 
         final_molecule_file = os.path.join(
-            sim_dir, f"{molecule_name}_minimized_sliced_fixed.pdb"
+            sim_dir, f"{molecule_name}_minimized_fixed.pdb"
         )
 
         partial = mda.Universe(
@@ -589,132 +495,83 @@ def serialize_simulations(sims: list[Simulation], base_dir: str, molecule_name: 
                     writer.writerow([chain, resid, val])
 
 
-# def parse_simulations_file(file: str) -> list[Summary]:
-#     with open(file, "r") as f:
-#         reader = csv.reader(f)
-#         next(reader)  # Skip the header
-#         sims = []
-#         for row in reader:
-#             label = row[0]
-#             if label == "Whole Molecule":
-#                 # skip the whole molecule sim for now
-#                 continue
+def get_rmsd_plot(molecule_dir: str):
+    rmsd_file_regex = re.compile(r".+r([0-9]+)d([0-9]+)_rmsd.csv")
 
-#             label_regex = re.compile(r"r([0-9]+)d([0-9]+)")
-#             match = label_regex.match(label)
-#             if match:
-#                 radius = int(match.group(1))
-#                 depth = int(match.group(2))
-#             else:
-#                 # TODO appropriate exception
-#                 raise ComparisonError(
-#                     f"Invalid label format: {label}. Expected format: r[0-9]+d[0-9]+"
-#                 )
+    global_data = pd.DataFrame()
+    data_frames = []
+    for file in os.listdir(molecule_dir):
+        if rmsd_file_regex.match(file):
+            radius = int(rmsd_file_regex.match(file).group(1))
+            depth = int(rmsd_file_regex.match(file).group(2))
 
-#             duration = float(row[1])
-#             n_atoms = int(row[2])
-#             avg_rmsd = float(row[3])
-#             avg_rmsd_static = float(row[4])
-#             avg_rmsf_h = float(row[5]) if row[5] else None
-#             avg_rmsf_l = float(row[6]) if row[6] else None
+            neigh_data = pd.read_csv(os.path.join(molecule_dir, file))
+            downsampled = neigh_data.groupby(neigh_data.index // 5).mean()
+            downsampled["Label"] = f"r{radius}d{depth}"
 
-#             sim = Summary(
-#                 avg_rmsd,
-#                 avg_rmsd_static,
-#                 avg_rmsf_h,
-#                 avg_rmsf_l,
-#                 duration,
-#                 n_atoms,
-#                 radius,
-#                 depth,
-#             )
-#             sims.append(sim)
+            data_frames.append(downsampled)
 
-#     return sims
+    global_data = pd.concat(data_frames, ignore_index=True)
+
+    global_data.rename(columns={"Label": "Intorno"}, inplace=True)
+
+    g = sns.relplot(
+        data=global_data,
+        kind="line",
+        x="Frame",
+        y="RMSD",
+        hue="Intorno",
+        height=5,
+        legend="full",
+    )
+
+    molecule_name = Path(molecule_dir).name
+    g.ax.set_title(f"{molecule_name}")
+    g.ax.set_xlabel("Frame")
+    g.ax.set_ylabel("RMSD (Å)")
+
+    return global_data
 
 
-def plot_rmsd(base_dir: str):
-    for molecule_dir in os.listdir(base_dir):
-        if molecule_dir == "ignore":
-            continue
+def get_rmsf_plot(molecule_dir: str):
+    molecule_name = Path(molecule_dir).name
 
-        molecule_dir = os.path.join(base_dir, molecule_dir)
-        if not os.path.isdir(molecule_dir):
-            continue
+    data = pd.read_csv(os.path.join(molecule_dir, f"{molecule_name}_comparison.csv"))
+    data = data.drop(
+        columns=["Duration", "Atoms", "Avg. RMSD vs Full", "Avg. RMSD vs Static"]
+    )
 
-        molecule_name = Path(molecule_dir).name
+    # to long format
+    data = data.melt(id_vars=["Label"], var_name="Chain", value_name="RMSF")
+    data["Chain"] = data["Chain"].str.replace("Avg. RMSF ", "")
 
-        rmsd_file_regex = re.compile(r".+r([0-9]+)d([0-9]+)_rmsd.csv")
+    # we plot the variation in RMSF for the different neighbourhood sizes and each chain
+    full_rmsf = data[data["Label"] == "Whole Molecule"].set_index("Chain")["RMSF"]
+    data_partial = data[data["Label"] != "Whole Molecule"].copy()
+    data_partial["ΔRMSF"] = data_partial.apply(
+        lambda row: row["RMSF"] - full_rmsf.get(row["Chain"], 0), axis=1
+    )
 
-        global_data = pd.DataFrame()
-        data_frames = []
-        for file in os.listdir(molecule_dir):
-            if rmsd_file_regex.match(file):
-                radius = int(rmsd_file_regex.match(file).group(1))
-                depth = int(rmsd_file_regex.match(file).group(2))
+    heatmap_data = data_partial.pivot(index="Chain", columns="Label", values="ΔRMSF")
 
-                neigh_data = pd.read_csv(os.path.join(molecule_dir, file))
-                downsampled = neigh_data.groupby(neigh_data.index // 5).mean()
-                downsampled["Label"] = f"r{radius}d{depth}"
+    plt.figure(figsize=(5, 5))
 
-                data_frames.append(downsampled)
+    ax = sns.heatmap(
+        heatmap_data,
+        annot=True,
+        fmt=".2f",
+        center=0.0,
+        cmap="coolwarm",
+        cbar_kws={"label": "ΔRMSF (Å)"},
+    )
+    # ax.set_title(f"RMSF of partial simulations for {molecule_name}")
+    ax.set_xlabel("Intorno")
+    ax.set_ylabel("Catena")
 
-        global_data = pd.concat(data_frames, ignore_index=True)
-
-        g = sns.lineplot(
-            data=global_data,
-            x="Frame",
-            y="RMSD",
-            hue="Label",
-        )
-
-        g.set_title(f"RMSD of partial simulations for {molecule_name}")
-        g.set_xlabel("Frame")
-        g.set_ylabel("RMSD (Å)")
+    return ax
 
 
-def plot_rmsf(base_dir: str):
-    for molecule_dir in os.listdir(base_dir):
-        if molecule_dir == "ignore":
-            continue
-
-        molecule_dir = os.path.join(base_dir, molecule_dir)
-        if not os.path.isdir(molecule_dir):
-            continue
-
-        molecule_name = Path(molecule_dir).name
-
-        data = pd.read_csv(
-            os.path.join(molecule_dir, f"{molecule_name}_comparison.csv")
-        )
-        data = data.drop(
-            columns=["Duration", "Atoms", "Avg. RMSD vs Full", "Avg. RMSD vs Static"]
-        )
-
-        data = data.melt(
-            id_vars=["Label"],
-            var_name="Chain",
-            value_name="RMSF",
-        )
-
-        data["Chain"] = data["Chain"].str.replace("Avg. RMSF ", "")
-
-        g = sns.catplot(
-            data=data,
-            kind="bar",
-            x="Chain",
-            y="RMSF",
-            hue="Label",
-        )
-
-        for container in g.ax.containers:
-            g.ax.bar_label(container, fmt="%.2f", padding=2)
-
-        g.ax.set_title(f"RMSF of partial simulations for {molecule_name}")
-        g.set_axis_labels("Chain", "RMSF (Å)")
-
-
-def plot_duration(base_dir: str):
+def plot_size_duration_correlation(base_dir: str):
     # plot a scatterplot of size reduction vs duration gain across all molecules
 
     global_data = pd.DataFrame()
@@ -732,6 +589,11 @@ def plot_duration(base_dir: str):
             os.path.join(molecule_dir, f"{molecule_name}_comparison.csv")
         )
 
+        data["Label"] = data["Label"].replace("Whole Molecule", "Full")
+        data.rename(columns={"Label": "Type"}, inplace=True)
+
+        data = data.drop(data.columns.difference(["Type", "Atoms", "Duration"]), axis=1)
+
         data["Size Reduction"] = (
             (data["Atoms"].iloc[0] - data["Atoms"]) / data["Atoms"].iloc[0]
         ) * 100
@@ -748,20 +610,52 @@ def plot_duration(base_dir: str):
         data=global_data,
         x="Size Reduction",
         y="Duration Reduction",
-        hue="Label",
+        hue="Type",
     )
 
-    g.set_title("Size reduction vs duration reduction across all molecules")
-    g.set_xlabel("Size reduction (%)")
-    g.set_ylabel("Duration reduction (%)")
+    # g.set_title("Size reduction vs duration reduction across all molecules")
+    g.set_xlabel("Size Reduction (%)")
+    g.set_ylabel("Duration Reduction (%)")
+
+    plt.savefig(
+        os.path.join(base_dir, "size_vs_duration.png"),
+        dpi=300,
+        bbox_inches="tight",
+    )
+    plt.close("all")
 
 
-def plot_all(dir: str):
-    # plot_rmsd(dir)
-    # plot_rmsf(dir)
-    plot_duration(dir)
+def plot_molecule(base_dir: str, molecule_dir: str):
+    get_rmsd_plot(molecule_dir)
+    plt.savefig(
+        os.path.join(base_dir, f"{Path(molecule_dir).name}_rmsd.png"),
+        dpi=300,
+        bbox_inches="tight",
+    )
+    plt.figure()
+    get_rmsf_plot(molecule_dir)
+    plt.savefig(
+        os.path.join(base_dir, f"{Path(molecule_dir).name}_rmsf.png"),
+        dpi=300,
+        bbox_inches="tight",
+    )
+    plt.close("all")
 
-    plt.show()
+    # plt.show()
+
+
+def plot_all(base_dir: str):
+    for molecule_dir in os.listdir(base_dir):
+        if molecule_dir == "ignore":
+            continue
+
+        molecule_dir = os.path.join(base_dir, molecule_dir)
+        if not os.path.isdir(molecule_dir):
+            continue
+
+        plot_molecule(base_dir, molecule_dir)
+
+    print("Done!")
 
 
 def compare_sims(base_dir: str, molecule_name: str, n_frames_str: str):
@@ -860,50 +754,10 @@ def compare_sims(base_dir: str, molecule_name: str, n_frames_str: str):
 
     serialize_simulations(sims, base_dir, molecule_name)
 
-    # _, (rmsd_ax, rmsd_static_ax) = plt.subplots(2, 1)
-    # rmsd_ax.set_title("Partial VS full simulation")
-    # rmsd_static_ax.set_title("Simulation VS static molecule")
-    # # compare each frame with the static paratope
-    # plot_rmsd_static(rmsd_static_ax, sims, n_frames)
-    # # compare each frame of partial simulations with those of the full simulation
-    # plot_rmsd(rmsd_ax, sims, n_frames)
-
-    # _, (dur_ax, dur_with_full_ax) = plt.subplots(2, 1)
-    # dur_ax.set_title("Simulation duration")
-    # # plot durations only for partial simulations since they are much shorter than the full one
-    # plot_duration(dur_ax, [sim for sim in sims if sim.label != "Whole Molecule"])
-    # # include the full simulation in the runtime plot
-    # plot_duration(dur_with_full_ax, sims)
-
-    # fig_rmsf_h, rmsf_ax_h = plt.subplots(layout="constrained")
-    # rmsf_ax_h.set_title("RMSF of the paratope on H")
-    # # ax_rmsf_h = fig_rmsf_h.add_axes((0.7, 0.05, 0.1, 0.075))
-    # # btn_rmsf_h = Button(ax_rmsf_h, "Annotate")
-    # # btn_rmsf_h.on_clicked(lambda _: toggle_annotation(rmsf_ax_h, avg_rmsf_h_by_neigh))
-    # # buttons.append(btn_rmsf_h)
-    # plot_rmsf(rmsf_ax_h, [sim for sim in sims if sim.rmsf_h is not None], "heavy")
-
-    # fig_rmsf_l, rmsf_ax_l = plt.subplots(layout="constrained")
-    # rmsf_ax_l.set_title("RMSF of the paratope on L")
-    # # ax_rmsf_l = fig_rmsf_l.add_axes((0.7, 0.05, 0.1, 0.075))
-    # # btn_rmsf_l = Button(ax_rmsf_l, "Annotate")
-    # # btn_rmsf_l.on_clicked(lambda _: toggle_annotation(rmsf_ax_l, avg_rmsf_l_by_neigh))
-    # # buttons.append(btn_rmsf_l)
-    # plot_rmsf(rmsf_ax_l, [sim for sim in sims if sim.rmsf_l is not None], "light")
-
-    # _, rmsf_ax_full = plt.subplots()
-    # rmsf_ax_full.set_title("RMSF on the full molecule")
-    # plot_rmsf(
-    #     rmsf_ax_full, [sim for sim in sims if sim.label == "Whole Molecule"], "heavy"
-    # )
-
-    # plt.show()
-
     print("Done!")
 
 
 cmd.extend("compare_sims", compare_sims)
-cmd.extend("plot_rmsd", plot_rmsd)
-cmd.extend("plot_rmsf", plot_rmsf)
+cmd.extend("plot_comparison", plot_size_duration_correlation)
 cmd.extend("plot_duration", plot_duration)
 cmd.extend("plot_all", plot_all)
