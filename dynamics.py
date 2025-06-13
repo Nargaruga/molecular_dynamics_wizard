@@ -94,6 +94,7 @@ class Dynamics(Wizard):
         self.tasks = []
         self.tasks_lock = threading.Lock()
         self.extra_msg = ""
+        self.collapsed = False
 
     def get_prompt(self):  # type: ignore
         """Return the prompt for the current state of the wizard."""
@@ -124,109 +125,124 @@ class Dynamics(Wizard):
             [1, "Molecular Dynamics", ""],
         ]
 
-        # Basic entries
-        if self.input_state >= WizardInputState.READY:
-            if self.molecule is None:
-                molecule_label = "Choose molecule"
-            else:
-                molecule_label = self.molecule
-
-            sim_type_label = f"Simulation type: {self.sim_type.value}"
-
-            options.extend(
-                [
-                    [3, molecule_label, "molecule"],
-                    [3, sim_type_label, "sim_type"],
-                ]
-            )
-
-        if self.input_state >= WizardInputState.MOLECULE_SELECTED:
-            options.extend(
-                [
-                    [2, "Minimize Energy", "cmd.get_wizard().minimize_structure()"],
-                ]
-            )
-
-        # Add entries for partial simulations
-        if self.sim_type == SimulationType.PARTIAL:
-            if self.input_state >= WizardInputState.MOLECULE_SELECTED:
-                paratope_detection_type_label = "Mode: "
-                if self.paratope_detection_type == ParatopeDetectionType.NEW:
-                    paratope_detection_type_label += "New paratope"
+        if not self.collapsed:
+            # Basic entries
+            if self.input_state >= WizardInputState.READY:
+                if self.molecule is None:
+                    molecule_label = "Choose molecule"
                 else:
-                    paratope_detection_type_label += "Existing paratope"
+                    molecule_label = self.molecule
 
-                options.append(
-                    [
-                        2,
-                        paratope_detection_type_label,
-                        "cmd.get_wizard().toggle_paratope_detection_mode()",
-                    ],
-                )
-                heavy_chains_label = "Heavy Chains: "
-                if self.heavy_chains:
-                    heavy_chains_label += ", ".join(self.heavy_chains)
-                else:
-                    heavy_chains_label += "None"
-
-                light_chains_label = "Light Chains: "
-                if self.light_chains:
-                    light_chains_label += ", ".join(self.light_chains)
-                else:
-                    light_chains_label += "None"
+                sim_type_label = f"Simulation type: {self.sim_type.value}"
 
                 options.extend(
                     [
-                        [3, heavy_chains_label, "heavy_chain"],
-                        [3, light_chains_label, "light_chain"],
+                        [3, molecule_label, "molecule"],
+                        [3, sim_type_label, "sim_type"],
                     ]
                 )
 
-            detect_binging_site_btn = [
-                2,
-                "Detect Binding Site",
-                "cmd.get_wizard().detect_binding_site()",
-            ]
+            if self.input_state >= WizardInputState.MOLECULE_SELECTED:
+                options.extend(
+                    [
+                        [2, "Minimize Energy", "cmd.get_wizard().minimize_structure()"],
+                    ]
+                )
 
-            if self.input_state >= WizardInputState.CHAINS_SELECTED:
-                if self.paratope_detection_type == ParatopeDetectionType.EXISTING:
-                    paratope_selection_label = "Paratope: "
-                    if self.custom_paratope:
-                        paratope_selection_label += self.custom_paratope
+            # Add entries for partial simulations
+            if self.sim_type == SimulationType.PARTIAL:
+                if self.input_state >= WizardInputState.MOLECULE_SELECTED:
+                    paratope_detection_type_label = "Mode: "
+                    if self.paratope_detection_type == ParatopeDetectionType.NEW:
+                        paratope_detection_type_label += "New paratope"
                     else:
-                        paratope_selection_label += "None"
-                    options.append(
-                        [3, paratope_selection_label, "paratope_selection"],
-                    )
-                elif self.paratope_detection_type == ParatopeDetectionType.NEW:
-                    options.append(detect_binging_site_btn)
+                        paratope_detection_type_label += "Existing paratope"
 
-            # TODO this is becoming a mess
-            if (
-                self.input_state >= WizardInputState.PARATOPE_SELECTED
-                and self.paratope_detection_type == ParatopeDetectionType.EXISTING
-            ):
-                options.append(detect_binging_site_btn)
+                    options.append(
+                        [
+                            2,
+                            paratope_detection_type_label,
+                            "cmd.get_wizard().toggle_paratope_detection_mode()",
+                        ],
+                    )
+                    if self.paratope_detection_type == ParatopeDetectionType.NEW:
+                        heavy_chains_label = "Heavy Chains: "
+                        if self.heavy_chains:
+                            heavy_chains_label += ", ".join(self.heavy_chains)
+                        else:
+                            heavy_chains_label += "None"
+
+                        light_chains_label = "Light Chains: "
+                        if self.light_chains:
+                            light_chains_label += ", ".join(self.light_chains)
+                        else:
+                            light_chains_label += "None"
+
+                        options.extend(
+                            [
+                                [3, heavy_chains_label, "heavy_chain"],
+                                [3, light_chains_label, "light_chain"],
+                            ]
+                        )
+                    elif self.paratope_detection_type == ParatopeDetectionType.EXISTING:
+                        paratope_selection_label = "Paratope: "
+                        if self.custom_paratope:
+                            paratope_selection_label += self.custom_paratope
+                        else:
+                            paratope_selection_label += "None"
+                        options.append(
+                            [3, paratope_selection_label, "paratope_selection"],
+                        )
+
+                if (
+                    self.input_state >= WizardInputState.CHAINS_SELECTED
+                    or self.input_state == WizardInputState.PARATOPE_SELECTED
+                ):
+                    options.append(
+                        [
+                            2,
+                            "Detect Binding Site",
+                            "cmd.get_wizard().detect_binding_site()",
+                        ]
+                    )
+
+                if self.input_state >= WizardInputState.SIMULATION_READY:
+                    radius_label = f"Neighbourhood Radius: {self.sim_radius}"
+                    depth_label = f"Neighbourhood Depth: {self.sim_depth}"
+
+                    options.extend(
+                        [
+                            [3, radius_label, "sim_radius"],
+                            [3, depth_label, "sim_depth"],
+                        ]
+                    )
 
             if self.input_state >= WizardInputState.SIMULATION_READY:
-                radius_label = f"Neighbourhood Radius: {self.sim_radius}"
-                depth_label = f"Neighbourhood Depth: {self.sim_depth}"
-
-                options.extend(
-                    [
-                        [3, radius_label, "sim_radius"],
-                        [3, depth_label, "sim_depth"],
-                    ]
+                options.append(
+                    [2, "Run Simulation", "cmd.get_wizard().run()"],
                 )
 
-        if self.input_state >= WizardInputState.SIMULATION_READY:
-            options.append(
-                [2, "Run Simulation", "cmd.get_wizard().run()"],
-            )
+        if self.collapsed:
+            collapse_label = "Expand"
+        else:
+            collapse_label = "Collapse"
 
-        options.append([2, "Dismiss", "cmd.set_wizard()"])
+        options.extend(
+            [
+                [2, collapse_label, "cmd.get_wizard().toggle_collapse()"],
+                [2, "Dismiss", "cmd.set_wizard()"],
+            ]
+        )
 
         return options
+
+    def toggle_collapse(self):
+        """Toggle the collapse state of the wizard."""
+
+        with self.state_lock:
+            self.collapsed = not self.collapsed
+
+        cmd.refresh_wizard()
 
     def add_task(self, task: WizardTask):
         """Add a task to the list of tasks."""
