@@ -504,23 +504,32 @@ def get_rmsd_plot(molecule_dir: str):
         if rmsd_file_regex.match(file):
             radius = int(rmsd_file_regex.match(file).group(1))
             depth = int(rmsd_file_regex.match(file).group(2))
+    global_data = pd.DataFrame()
+    data_frames = []
+    for file in os.listdir(molecule_dir):
+        if rmsd_file_regex.match(file):
+            radius = int(rmsd_file_regex.match(file).group(1))
+            depth = int(rmsd_file_regex.match(file).group(2))
 
+            neigh_data = pd.read_csv(os.path.join(molecule_dir, file))
+            downsampled = neigh_data.groupby(neigh_data.index // 5).mean()
+            downsampled["Label"] = f"r{radius}d{depth}"
             neigh_data = pd.read_csv(os.path.join(molecule_dir, file))
             downsampled = neigh_data.groupby(neigh_data.index // 5).mean()
             downsampled["Label"] = f"r{radius}d{depth}"
 
             data_frames.append(downsampled)
+            data_frames.append(downsampled)
 
     global_data = pd.concat(data_frames, ignore_index=True)
-
-    global_data.rename(columns={"Label": "Intorno"}, inplace=True)
+    global_data = pd.concat(data_frames, ignore_index=True)
 
     g = sns.relplot(
         data=global_data,
         kind="line",
         x="Frame",
         y="RMSD",
-        hue="Intorno",
+        hue="Label",
         height=5,
         legend="full",
     )
@@ -540,7 +549,14 @@ def get_rmsf_plot(molecule_dir: str):
     data = data.drop(
         columns=["Duration", "Atoms", "Avg. RMSD vs Full", "Avg. RMSD vs Static"]
     )
+    data = pd.read_csv(os.path.join(molecule_dir, f"{molecule_name}_comparison.csv"))
+    data = data.drop(
+        columns=["Duration", "Atoms", "Avg. RMSD vs Full", "Avg. RMSD vs Static"]
+    )
 
+    # to long format
+    data = data.melt(id_vars=["Label"], var_name="Chain", value_name="RMSF")
+    data["Chain"] = data["Chain"].str.replace("Avg. RMSF ", "")
     # to long format
     data = data.melt(id_vars=["Label"], var_name="Chain", value_name="RMSF")
     data["Chain"] = data["Chain"].str.replace("Avg. RMSF ", "")
@@ -554,19 +570,17 @@ def get_rmsf_plot(molecule_dir: str):
 
     heatmap_data = data_partial.pivot(index="Chain", columns="Label", values="ΔRMSF")
 
-    plt.figure(figsize=(5, 5))
-
     ax = sns.heatmap(
         heatmap_data,
         annot=True,
         fmt=".2f",
         center=0.0,
         cmap="coolwarm",
-        cbar_kws={"label": "ΔRMSF (Å)"},
+        cbar_kws={"label": "RMSF (Å)"},
     )
     # ax.set_title(f"RMSF of partial simulations for {molecule_name}")
-    ax.set_xlabel("Intorno")
-    ax.set_ylabel("Catena")
+    ax.set_xlabel("Neighbourhood depth")
+    ax.set_ylabel("Chain")
 
     return ax
 
@@ -760,4 +774,5 @@ def compare_sims(base_dir: str, molecule_name: str, n_frames_str: str):
 cmd.extend("compare_sims", compare_sims)
 cmd.extend("plot_comparison", plot_size_duration_correlation)
 cmd.extend("plot_duration", plot_duration)
+cmd.extend("plot_molecule", plot_molecule)
 cmd.extend("plot_all", plot_all)
