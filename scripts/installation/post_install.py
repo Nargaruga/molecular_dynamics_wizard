@@ -26,8 +26,9 @@ def main():
                 "base",
                 "--no-capture-output",
                 "install_wizard",
-                paratope_wizard_root,
+                "--env_name",
                 env_name,
+                paratope_wizard_root,
             ],
             check=True,
         )
